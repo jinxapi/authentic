@@ -46,7 +46,7 @@ where
     type Response = reqwest::Response;
     type Error = reqwest::Error;
 
-    fn configure(&mut self, builder: Self::Builder) -> Self::Builder {
+    fn configure(&self, builder: Self::Builder) -> Self::Builder {
         builder.header(self.header_name.as_ref(), self.credential.token())
     }
 }
@@ -75,7 +75,7 @@ where
     type Response = reqwest::Response;
     type Error = reqwest::Error;
 
-    fn configure(&mut self, builder: Self::Builder) -> Self::Builder {
+    fn configure(&self, builder: Self::Builder) -> Self::Builder {
         let header_value = ::http_auth::basic::encode_credentials(
             self.credential.username(),
             self.credential.password(),

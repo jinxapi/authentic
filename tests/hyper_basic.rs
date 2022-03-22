@@ -2,7 +2,7 @@
 
 use authentic::credential::UsernamePasswordCredential;
 use authentic::hyper::{HttpAuthentication, BasicAuthentication};
-use authentic::{Authenticate, AuthenticationScheme, AuthenticationStep, Scheme};
+use authentic::{AuthenticateBuilder, AuthenticationScheme, AuthenticationStep, Scheme};
 use http::StatusCode;
 use hyper::Client;
 use hyper_tls::HttpsConnector;
@@ -32,7 +32,7 @@ async fn test_basic_authentication(
             }
         }
         let request = ::hyper::Request::get("https://httpbin.org/basic-auth/username/password")
-            .authenticate(&mut scheme)
+            .with_authentication(&scheme)
             .body(::hyper::Body::empty())?;
 
         dbg!(&request);
@@ -79,7 +79,7 @@ async fn test_basic_challenge(
             }
         }
         let request = ::hyper::Request::get("https://httpbin.org/basic-auth/username/password")
-            .authenticate(&mut scheme)
+            .with_authentication(&scheme)
             .body(::hyper::Body::empty())?;
 
         dbg!(&request);

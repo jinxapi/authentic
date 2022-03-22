@@ -51,7 +51,7 @@ pub trait AuthenticationScheme {
         panic!("Unexpected auth response");
     }
 
-    fn configure(&mut self, builder: Self::Builder) -> Self::Builder {
+    fn configure(&self, builder: Self::Builder) -> Self::Builder {
         builder
     }
 
@@ -74,14 +74,14 @@ pub trait AuthenticationScheme {
 }
 
 // Allow request builder authentication to use fluent model.
-pub trait Authenticate<Request, Response, Error>
+pub trait AuthenticateBuilder<Request, Response, Error>
 where
     Self: Sized,
 {
     #[must_use]
-    fn authenticate(
+    fn with_authentication(
         self,
-        scheme: &mut dyn AuthenticationScheme<
+        scheme: &dyn AuthenticationScheme<
             Builder = Self,
             Request = Request,
             Response = Response,
@@ -93,13 +93,13 @@ where
 }
 
 #[cfg(feature = "hyper")]
-impl Authenticate<::hyper::Request<::hyper::Body>, ::hyper::Response<::hyper::Body>, ::hyper::Error>
+impl AuthenticateBuilder<::hyper::Request<::hyper::Body>, ::hyper::Response<::hyper::Body>, ::hyper::Error>
     for http::request::Builder
 {
 }
 
 #[cfg(feature = "reqwest")]
-impl Authenticate<::reqwest::Request, ::reqwest::Response, ::reqwest::Error>
+impl AuthenticateBuilder<::reqwest::Request, ::reqwest::Response, ::reqwest::Error>
     for ::reqwest::RequestBuilder
 {
 }
@@ -161,7 +161,7 @@ where
         }
     }
 
-    fn configure(&mut self, builder: Self::Builder) -> Self::Builder {
+    fn configure(&self, builder: Self::Builder) -> Self::Builder {
         match self {
             Scheme::Initial(scheme) => scheme.configure(builder),
             Scheme::Boxed(scheme) => scheme.configure(builder),

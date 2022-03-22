@@ -1,13 +1,16 @@
 [package]
 edition = "2021"
 name = "authentic"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["Jonathan Giddy"]
 description = "Authentication library"
 homepage = "https://github.com/jinxapi/authentic/blob/main/README.md"
 categories = ["authentication"]
 license = "Apache-2.0"
 repository = "https://github.com/jinxapi/authentic"
+
+[package.metadata.docs.rs]
+all-features = true
 
 [features]
 full = ["hyper_async", "reqwest_async", "reqwest_blocking"]

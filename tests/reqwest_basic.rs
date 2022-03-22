@@ -3,7 +3,7 @@
 use ::reqwest::Client;
 use authentic::credential::UsernamePasswordCredential;
 use authentic::reqwest::{BasicAuthentication, HttpAuthentication};
-use authentic::{Authenticate, AuthenticationScheme, AuthenticationStep, Scheme};
+use authentic::{AuthenticateBuilder, AuthenticationScheme, AuthenticationStep, Scheme};
 use http::StatusCode;
 
 /// Test direct basic authentication, passing the username and password on the first request.
@@ -30,7 +30,7 @@ async fn test_basic_authentication(
             }
         }
         let request = client.get("https://httpbin.org/basic-auth/username/password")
-            .authenticate(&mut scheme)
+            .with_authentication(&scheme)
             .build()?;
 
         dbg!(&request);
@@ -76,7 +76,7 @@ async fn test_basic_challenge() -> Result<(), Box<dyn std::error::Error + Send +
         }
         let request = client
             .get("https://httpbin.org/basic-auth/username/password")
-            .authenticate(&mut scheme)
+            .with_authentication(&scheme)
             .build()?;
 
         dbg!(&request);
