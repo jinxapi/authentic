@@ -1,0 +1,29 @@
+[package]
+edition = "2021"
+name = "authentic"
+version = "0.1.0"
+authors = ["Jonathan Giddy"]
+description = "Authentication library"
+homepage = "https://github.com/jinxapi/authentic/blob/main/README.md"
+categories = ["authentication"]
+license = "Apache-2.0"
+repository = "https://github.com/jinxapi/authentic"
+
+[features]
+full = ["hyper_async", "reqwest_async", "reqwest_blocking"]
+hyper_async = ["hyper", "http-auth"]
+reqwest_async = ["reqwest"]
+reqwest_blocking = ["reqwest/blocking"]
+
+[dependencies]
+http = "0.2.6"
+http-auth = { version = "0.1.5", features = ["basic-scheme"], optional = true }
+hyper = { version = "0.14", optional = true }
+reqwest = { version = "0.11", optional = true }
+thiserror = "1"
+
+[dev-dependencies]
+hyper = { version = "0.14", features = ["full"] }
+hyper-tls = "0.5.0"
+reqwest = "0.11.10"
+tokio = { version = "1.17.0", features = ["full"] }
