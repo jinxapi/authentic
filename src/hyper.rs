@@ -1,9 +1,14 @@
+//! Authentication schemes for use with `hyper`. Use the `hyper_async` feature to enable these.
+
 use std::borrow::Cow;
 use std::sync::Arc;
 
 use crate::credential::{AuthenticationCredentialToken, AuthenticationCredentialUsernamePassword};
 use crate::AuthenticationScheme;
 
+/// No authentication scheme
+///
+/// Identical to not using `authentic` but allows minimal code changes when changing schemes.
 pub struct NoAuthentication;
 
 impl NoAuthentication {
@@ -20,6 +25,7 @@ impl AuthenticationScheme for NoAuthentication {
     type Error = hyper::Error;
 }
 
+/// Authentication using a token in a specified haeader.
 pub struct HeaderAuthentication<Credential> {
     header_name: Cow<'static, [u8]>,
     credential: Arc<Credential>,
@@ -51,6 +57,7 @@ where
     }
 }
 
+/// Authentication using HTTP Basic authentication on the initial call without waiting for a challenge.
 pub struct BasicAuthentication<Credential> {
     credential: Arc<Credential>,
 }
@@ -84,6 +91,12 @@ where
     }
 }
 
+/// Authentication using HTTP Basic authentication to respond to a challenge.
+///
+/// This currently only supports Basic authentication and uses the provided username and
+/// password regardless of the `www-authenticate` header in the initial response.
+///
+/// This limitation is expected to be removed in a future version.
 pub struct HttpAuthentication<Credential> {
     credential: Arc<Credential>,
 }

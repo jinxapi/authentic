@@ -2,7 +2,7 @@
 
 use authentic::credential::UsernamePasswordCredential;
 use authentic::hyper::{BasicAuthentication, HttpAuthentication};
-use authentic::{AuthenticateBuilder, AuthenticationScheme, AuthenticationStep};
+use authentic::{AuthenticationScheme, AuthenticationStep, WithAuthentication};
 use http::StatusCode;
 use hyper::Client;
 use hyper_tls::HttpsConnector;

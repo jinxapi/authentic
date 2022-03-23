@@ -3,7 +3,7 @@
 use ::reqwest::Client;
 use authentic::credential::UsernamePasswordCredential;
 use authentic::reqwest::{BasicAuthentication, HttpAuthentication};
-use authentic::{AuthenticateBuilder, AuthenticationScheme, AuthenticationStep};
+use authentic::{AuthenticationScheme, AuthenticationStep, WithAuthentication};
 use http::StatusCode;
 
 /// Test direct basic authentication, passing the username and password on the first request.
