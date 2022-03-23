@@ -1,8 +1,8 @@
 #![cfg(feature = "hyper")]
 
 use authentic::credential::UsernamePasswordCredential;
-use authentic::hyper::{HttpAuthentication, BasicAuthentication};
-use authentic::{AuthenticateBuilder, AuthenticationScheme, AuthenticationStep, Scheme};
+use authentic::hyper::{BasicAuthentication, HttpAuthentication};
+use authentic::{AuthenticateBuilder, AuthenticationScheme, AuthenticationStep};
 use http::StatusCode;
 use hyper::Client;
 use hyper_tls::HttpsConnector;
@@ -19,7 +19,7 @@ async fn test_basic_authentication(
 
     let mut status_codes = Vec::new();
 
-    let response = loop {
+    let _response = loop {
         while let Some(auth_step) = scheme.step() {
             match auth_step {
                 AuthenticationStep::Request(request) => {
@@ -43,10 +43,9 @@ async fn test_basic_authentication(
 
         status_codes.push(response.status());
 
-        scheme = match scheme.switch(&response) {
-            Some(boxed) => Scheme::Boxed(boxed),
-            None => break response,
-        };
+        if scheme.has_completed(&response) {
+            break response;
+        }
     };
 
     assert_eq!(status_codes, [StatusCode::OK]);
@@ -56,8 +55,7 @@ async fn test_basic_authentication(
 
 /// Test basic authentication, passing the username and password in response to a 401 challenge.
 #[::tokio::test]
-async fn test_basic_challenge(
-) -> Result<(), Box<dyn std::error::Error + Send + Sync + 'static>> {
+async fn test_basic_challenge() -> Result<(), Box<dyn std::error::Error + Send + Sync + 'static>> {
     let https = HttpsConnector::new();
     let client = Client::builder().build::<_, ::hyper::Body>(https);
 
@@ -66,7 +64,7 @@ async fn test_basic_challenge(
 
     let mut status_codes = Vec::new();
 
-    let response = loop {
+    let _response = loop {
         while let Some(auth_step) = scheme.step() {
             match auth_step {
                 AuthenticationStep::Request(request) => {
@@ -90,10 +88,9 @@ async fn test_basic_challenge(
 
         status_codes.push(response.status());
 
-        scheme = match scheme.switch(&response) {
-            Some(boxed) => Scheme::Boxed(boxed),
-            None => break response,
-        };
+        if scheme.has_completed(&response) {
+            break response;
+        }
     };
 
     assert_eq!(status_codes, [StatusCode::UNAUTHORIZED, StatusCode::OK]);

@@ -76,10 +76,6 @@ where
     type Error = reqwest::Error;
 
     fn configure(&self, builder: Self::Builder) -> Self::Builder {
-        let header_value = ::http_auth::basic::encode_credentials(
-            self.credential.username(),
-            self.credential.password(),
-        );
         builder.basic_auth(self.credential.username(), Some(self.credential.password()))
     }
 }

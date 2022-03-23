@@ -25,7 +25,10 @@ pub trait AuthenticationProcess {
         None
     }
 
-    fn auth_response<Response, Error>(&mut self, response: Result<Response, Error>) {
+    fn auth_response<Response, Error>(
+        &mut self,
+        #[allow(unused_variables)] response: Result<Response, Error>,
+    ) {
         panic!("Unexpected auth response");
     }
 }
@@ -47,7 +50,10 @@ pub trait AuthenticationScheme {
         None
     }
 
-    fn respond(&mut self, response: Result<Self::Response, Self::Error>) {
+    fn respond(
+        &mut self,
+        #[allow(unused_variables)] response: Result<Self::Response, Self::Error>,
+    ) {
         panic!("Unexpected auth response");
     }
 
@@ -58,7 +64,7 @@ pub trait AuthenticationScheme {
     #[allow(clippy::type_complexity)]
     fn switch(
         &mut self,
-        response: &Self::Response,
+        #[allow(unused_variables)] response: &Self::Response,
     ) -> Option<
         Box<
             dyn AuthenticationScheme<
@@ -93,8 +99,12 @@ where
 }
 
 #[cfg(feature = "hyper")]
-impl AuthenticateBuilder<::hyper::Request<::hyper::Body>, ::hyper::Response<::hyper::Body>, ::hyper::Error>
-    for http::request::Builder
+impl
+    AuthenticateBuilder<
+        ::hyper::Request<::hyper::Body>,
+        ::hyper::Response<::hyper::Body>,
+        ::hyper::Error,
+    > for http::request::Builder
 {
 }
 
@@ -130,6 +140,26 @@ where
             >,
         >,
     ),
+}
+
+impl<Initial, Builder, Request, Response, Error> Scheme<Initial, Builder, Request, Response, Error>
+where
+    Initial: AuthenticationScheme<
+        Builder = Builder,
+        Request = Request,
+        Response = Response,
+        Error = Error,
+    >,
+{
+    pub fn has_completed(&mut self, response: &Response) -> bool {
+        match self.switch(response) {
+            Some(boxed) => {
+                *self = Scheme::Boxed(boxed);
+                false
+            }
+            None => true,
+        }
+    }
 }
 
 impl<T, Builder, Request, Response, Error> AuthenticationScheme
