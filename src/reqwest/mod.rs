@@ -1,10 +1,14 @@
-//! Authentication schemes for use with `reqwest`. Use the `reqwest_async` feature to enable these.
+//! Authentication schemes for use with `reqwest`.
+//! Use the `reqwest_async` feature to enable these.
 
 use std::borrow::Cow;
 use std::sync::Arc;
 
 use crate::credential::{AuthenticationCredentialToken, AuthenticationCredentialUsernamePassword};
 use crate::AuthenticationScheme;
+
+#[cfg(feature = "reqwest_blocking")]
+pub mod blocking;
 
 /// No authentication scheme
 ///

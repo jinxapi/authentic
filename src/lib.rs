@@ -2,11 +2,11 @@
 //!
 //! Handle authentication of HTTP calls.
 //!
-//! Authentication schemes can require specific workflows, such as making third-party calls to refresh a token or performing a failing request to get challenge information.
+//! Authentication schemes can require specific workflows, such as making third-party calls to refresh a token or performing an initial request to get challenge information.
 //!
 //! Using a fixed code structure, `authentic` can perform the necessary interactions for each authentication scheme. This allows schemes to be changed easily.
 //!
-//! For example, the following code uses `reqwest` to access a site using HTTP Basic authentication.
+//! For example, the following code uses `reqwest` to access a site using HTTP Basic authentication. (See the [repository tests directory](https://github.com/jinxapi/authentic/tree/main/tests) for fully working examples).
 //!
 //! ```ignore
 //! use authentic::credential::UsernamePasswordCredential;
@@ -169,6 +169,12 @@ impl
 #[cfg(feature = "reqwest")]
 impl WithAuthentication<::reqwest::Request, ::reqwest::Response, ::reqwest::Error>
     for ::reqwest::RequestBuilder
+{
+}
+
+#[cfg(feature = "reqwest_blocking")]
+impl WithAuthentication<::reqwest::blocking::Request, ::reqwest::blocking::Response, ::reqwest::Error>
+    for ::reqwest::blocking::RequestBuilder
 {
 }
 

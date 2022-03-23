@@ -1,5 +1,5 @@
-//! Authentication schemes for use with `hyper`.
-//! Use the `hyper_async` feature to enable these.
+//! Authentication schemes for use with blocking `reqwest`.
+//! Use the `reqwest_blocking` feature to enable these.
 
 use std::borrow::Cow;
 use std::sync::Arc;
@@ -20,10 +20,10 @@ impl NoAuthentication {
 }
 
 impl AuthenticationScheme for NoAuthentication {
-    type Builder = http::request::Builder;
-    type Request = hyper::Request<hyper::Body>;
-    type Response = hyper::Response<hyper::Body>;
-    type Error = hyper::Error;
+    type Builder = reqwest::blocking::RequestBuilder;
+    type Request = reqwest::blocking::Request;
+    type Response = reqwest::blocking::Response;
+    type Error = reqwest::Error;
 }
 
 /// Authentication using a token in a specified haeader.
@@ -48,10 +48,10 @@ impl<Credential> AuthenticationScheme for HeaderAuthentication<Credential>
 where
     Credential: AuthenticationCredentialToken,
 {
-    type Builder = http::request::Builder;
-    type Request = hyper::Request<hyper::Body>;
-    type Response = hyper::Response<hyper::Body>;
-    type Error = hyper::Error;
+    type Builder = reqwest::blocking::RequestBuilder;
+    type Request = reqwest::blocking::Request;
+    type Response = reqwest::blocking::Response;
+    type Error = reqwest::Error;
 
     fn configure(&self, builder: Self::Builder) -> Self::Builder {
         builder.header(self.header_name.as_ref(), self.credential.token())
@@ -78,17 +78,13 @@ impl<Credential> AuthenticationScheme for BasicAuthentication<Credential>
 where
     Credential: AuthenticationCredentialUsernamePassword,
 {
-    type Builder = http::request::Builder;
-    type Request = hyper::Request<hyper::Body>;
-    type Response = hyper::Response<hyper::Body>;
-    type Error = hyper::Error;
+    type Builder = reqwest::blocking::RequestBuilder;
+    type Request = reqwest::blocking::Request;
+    type Response = reqwest::blocking::Response;
+    type Error = reqwest::Error;
 
     fn configure(&self, builder: Self::Builder) -> Self::Builder {
-        let header_value = ::http_auth::basic::encode_credentials(
-            self.credential.username(),
-            self.credential.password(),
-        );
-        builder.header(hyper::header::AUTHORIZATION, header_value)
+        builder.basic_auth(self.credential.username(), Some(self.credential.password()))
     }
 }
 
@@ -117,10 +113,10 @@ impl<Credential> AuthenticationScheme for HttpAuthentication<Credential>
 where
     Credential: AuthenticationCredentialUsernamePassword + 'static,
 {
-    type Builder = http::request::Builder;
-    type Request = hyper::Request<hyper::Body>;
-    type Response = hyper::Response<hyper::Body>;
-    type Error = hyper::Error;
+    type Builder = reqwest::blocking::RequestBuilder;
+    type Request = reqwest::blocking::Request;
+    type Response = reqwest::blocking::Response;
+    type Error = reqwest::Error;
 
     fn switch(
         &mut self,

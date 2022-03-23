@@ -2,11 +2,11 @@
 
 A Rust crate to handle authentication of HTTP calls.  Documentation at https://docs.rs/authentic/latest/authentic/.
 
-Authentication schemes can require specific workflows, such as making third-party calls to refresh a token or performing a failing request to get challenge information.
+Authentication schemes can require specific workflows, such as making third-party calls to refresh a token or performing an initial request to get challenge information.
 
 Using a fixed code structure, `authentic` can perform the necessary interactions for each authentication scheme. This allows schemes to be changed easily.
 
-For example, the following code uses `reqwest` to access a site using HTTP Basic authentication.
+For example, the following code uses `reqwest` to access a site using HTTP Basic authentication. (See the [repository tests directory](https://github.com/jinxapi/authentic/tree/main/tests) for fully working examples).
 
 ```rust
 let client = ::reqwest::Client::new();
@@ -42,7 +42,7 @@ let response = loop {
 The creation of the request takes place inside a loop. First, the authentication scheme is given an opportunity to perform any third-party calls using `step()`.
 HTTP Basic authentication does not use this, but it can be used, for example, to refresh an expired OAuth2 access token.
 
-The request is created using a standard `reqwest` RequestBuilder, using a new `with_authentication()` method to modify the request for the authentication scheme.
+The request is created using a standard `reqwest::RequestBuilder`, using a new `with_authentication()` method to modify the request for the authentication scheme.
 For HTTP authentication, the first iteration makes no change to the request.
 
 The request is sent and a response is received.  For HTTP authentication, this returns a `401 Unauthorized` response.
