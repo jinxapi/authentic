@@ -9,16 +9,18 @@ Using a fixed code structure, `authentic` can perform the necessary interactions
 For example, the following code uses `reqwest` to access a site using HTTP Basic authentication. (See the [repository tests directory](https://github.com/jinxapi/authentic/tree/main/tests) for fully working examples).
 
 ```rust
+// One-time code:
 let client = ::reqwest::blocking::Client::new();
 
 let mut realm_credentials = HashMap::new();
 realm_credentials.insert(
     "Fake Realm".into(),
-    UsernamePasswordCredential::new("username".into(), "password".into()),
+    UsernamePasswordCredential::new("username", "password"),
 );
-let credential = HttpRealmCredential::new(realm_credentials);
-let mut scheme = HttpAuthentication::new(&credential).into_scheme();
+let credential = HttpRealmCredentials::new(realm_credentials);
 
+// Per-request code:
+let mut scheme = HttpAuthentication::new(&credential).into_scheme();
 let response = loop {
     while let Some(auth_step) = scheme.step() {
         match auth_step {
@@ -31,6 +33,7 @@ let response = loop {
             }
         }
     }
+
     let request = client
         .get("https://httpbin.org/basic-auth/username/password")
         .with_authentication(&scheme)

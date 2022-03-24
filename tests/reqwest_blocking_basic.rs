@@ -3,17 +3,17 @@
 use std::collections::HashMap;
 
 use ::reqwest::blocking::Client;
-use authentic::credential::{HttpRealmCredential, UsernamePasswordCredential};
+use authentic::credential::{HttpRealmCredentials, UsernamePasswordCredential};
 use authentic::reqwest::blocking::{BasicAuthentication, HttpAuthentication};
 use authentic::{AuthenticationScheme, AuthenticationStep, WithAuthentication};
 use http::StatusCode;
 
-/// Test direct basic authentication, passing the username and password on the first request.
+/// Direct basic authentication, passing the username and password on the first request.
 #[test]
 fn test_basic_authentication() -> Result<(), Box<dyn std::error::Error>> {
     let client = Client::new();
 
-    let credential = UsernamePasswordCredential::new("username".into(), "password".into());
+    let credential = UsernamePasswordCredential::new("username", "password");
     let mut scheme = BasicAuthentication::new(&credential).into_scheme();
 
     let mut status_codes = Vec::new();
@@ -53,7 +53,7 @@ fn test_basic_authentication() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-/// Test basic authentication, passing the username and password in response to a 401 challenge.
+/// Basic authentication passing the username and password in response to a 401 challenge.
 #[test]
 fn test_basic_challenge() -> Result<(), Box<dyn std::error::Error>> {
     let client = Client::new();
@@ -61,9 +61,9 @@ fn test_basic_challenge() -> Result<(), Box<dyn std::error::Error>> {
     let mut realm_credentials = HashMap::new();
     realm_credentials.insert(
         "Fake Realm".into(),
-        UsernamePasswordCredential::new("username".into(), "password".into()),
+        UsernamePasswordCredential::new("username", "password"),
     );
-    let credential = HttpRealmCredential::new(realm_credentials);
+    let credential = HttpRealmCredentials::new(realm_credentials);
     let mut scheme = HttpAuthentication::new(&credential).into_scheme();
 
     let mut status_codes = Vec::new();

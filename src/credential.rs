@@ -20,9 +20,9 @@ pub struct TokenCredential {
 }
 
 impl TokenCredential {
-    pub fn new(token: Cow<'static, [u8]>) -> Arc<Self> {
+    pub fn new(token: impl Into<Cow<'static, [u8]>>) -> Arc<Self> {
         Arc::new(Self {
-            current_token: token,
+            current_token: token.into(),
         })
     }
 }
@@ -43,12 +43,12 @@ pub struct UsernamePasswordCredential {
 
 impl UsernamePasswordCredential {
     pub fn new(
-        username: Cow<'static, str>,
-        password: Cow<'static, str>,
+        username: impl Into<Cow<'static, str>>,
+        password: impl Into<Cow<'static, str>>,
     ) -> Arc<UsernamePasswordCredential> {
         Arc::new(UsernamePasswordCredential {
-            current_username: username,
-            current_password: password,
+            current_username: username.into(),
+            current_password: password.into(),
         })
     }
 }
@@ -69,15 +69,15 @@ impl AuthenticationCredentialUsernamePassword for UsernamePasswordCredential {
 ///
 /// For HTTP authentication, this selects the correct username/password credential for the realm
 /// returned by the `www-authenticate` header.
-pub struct HttpRealmCredential<Credential> {
+pub struct HttpRealmCredentials<Credential> {
     realm_credentials: HashMap<Cow<'static, str>, Arc<Credential>>,
 }
 
-impl<Credential> HttpRealmCredential<Credential> {
+impl<Credential> HttpRealmCredentials<Credential> {
     pub fn new(
         realm_credentials: HashMap<Cow<'static, str>, Arc<Credential>>,
-    ) -> Arc<HttpRealmCredential<Credential>> {
-        Arc::new(HttpRealmCredential { realm_credentials })
+    ) -> Arc<HttpRealmCredentials<Credential>> {
+        Arc::new(HttpRealmCredentials { realm_credentials })
     }
 
     pub fn get_credential(&self, realm: &str) -> Option<&Arc<Credential>> {
@@ -85,5 +85,5 @@ impl<Credential> HttpRealmCredential<Credential> {
     }
 }
 
-impl<Credential> AuthenticationProcess for HttpRealmCredential<Credential> {}
-impl<Credential> AuthenticationCredential for HttpRealmCredential<Credential> {}
+impl<Credential> AuthenticationProcess for HttpRealmCredentials<Credential> {}
+impl<Credential> AuthenticationCredential for HttpRealmCredentials<Credential> {}

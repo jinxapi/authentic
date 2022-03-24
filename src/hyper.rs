@@ -5,7 +5,7 @@ use std::borrow::Cow;
 use std::sync::Arc;
 
 use crate::credential::{
-    AuthenticationCredentialToken, AuthenticationCredentialUsernamePassword, HttpRealmCredential,
+    AuthenticationCredentialToken, AuthenticationCredentialUsernamePassword, HttpRealmCredentials,
 };
 use crate::{AuthenticError, AuthenticationScheme};
 
@@ -100,11 +100,11 @@ where
 ///
 /// This limitation is expected to be removed in a future version.
 pub struct HttpAuthentication<Credential> {
-    credential: Arc<HttpRealmCredential<Credential>>,
+    credential: Arc<HttpRealmCredentials<Credential>>,
 }
 
 impl<Credential> HttpAuthentication<Credential> {
-    pub fn new(credential: &Arc<HttpRealmCredential<Credential>>) -> Self {
+    pub fn new(credential: &Arc<HttpRealmCredentials<Credential>>) -> Self {
         Self {
             credential: credential.clone(),
         }
