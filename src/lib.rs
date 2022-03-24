@@ -13,20 +13,25 @@
 //! use authentic::reqwest::HttpAuthentication;
 //! use authentic::{AuthenticationScheme, AuthenticationStep, WithAuthentication};
 //!
-//! let client = ::reqwest::Client::new();
+//! let client = ::reqwest::blocking::Client::new();
 //!
-//! let credential = UsernamePasswordCredential::new("username".into(), "password".into());
+//! let mut realm_credentials = HashMap::new();
+//! realm_credentials.insert(
+//!     "Fake Realm".into(),
+//!     UsernamePasswordCredential::new("username".into(), "password".into()),
+//! );
+//! let credential = HttpRealmCredential::new(realm_credentials);
 //! let mut scheme = HttpAuthentication::new(&credential).into_scheme();
 //!
 //! let response = loop {
 //!     while let Some(auth_step) = scheme.step() {
 //!         match auth_step {
 //!             AuthenticationStep::Request(request) => {
-//!                 let auth_response = client.execute(request).await;
+//!                 let auth_response = client.execute(request);
 //!                 scheme.respond(auth_response);
 //!             }
 //!             AuthenticationStep::WaitFor(duration) => {
-//!                 time::sleep(duration).await;
+//!                 std::thread::sleep(duration);
 //!             }
 //!         }
 //!     }
@@ -35,9 +40,9 @@
 //!         .with_authentication(&scheme)
 //!         .build()?;
 //!
-//!     let response = client.execute(request).await?;
+//!     let response = client.execute(request)?;
 //!
-//!     if scheme.has_completed(&response) {
+//!     if scheme.has_completed(&response)? {
 //!         break response;
 //!     }
 //! };
@@ -52,7 +57,8 @@
 //! The request is sent and a response is received.  For HTTP authentication, this returns a `401 Unauthorized` response.
 //!
 //! The `has_completed()` method checks if the response is ready to be returned or if the authentication scheme needs to retry.
-//! For HTTP authentication, this reads the returned `www-authenticate` challenge and updates the scheme to send the correct credentials. As the request needs to be retried, `has_completed()` returns `false` and a second iteration begins.
+//! For HTTP authentication, this reads the returned `www-authenticate` challenge and establishes the correct credentials.
+//! As the request needs to be retried, `has_completed()` returns `false` and a second iteration begins.
 //!
 //! On the second iteration of the loop, `with_authentication()` adds the credentials as the `Authorization` header to the request. The request is authenticated and the response contains the correct data. `has_completed()` will return `true` and the loop exits with the response.
 
