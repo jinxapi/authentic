@@ -68,7 +68,9 @@ pub mod hyper;
 pub mod reqwest;
 
 #[derive(Error, Debug)]
-pub enum AuthenticateError {
+pub enum AuthenticError {
+    #[error("No credentials found for realm {0:?}")]
+    UnknownRealm(String),
     #[error("{0}")]
     Other(String),
 }
@@ -123,17 +125,20 @@ pub trait AuthenticationScheme {
     fn switch(
         &mut self,
         #[allow(unused_variables)] response: &Self::Response,
-    ) -> Option<
-        Box<
-            dyn AuthenticationScheme<
-                Builder = Self::Builder,
-                Request = Self::Request,
-                Response = Self::Response,
-                Error = Self::Error,
+    ) -> Result<
+        Option<
+            Box<
+                dyn AuthenticationScheme<
+                    Builder = Self::Builder,
+                    Request = Self::Request,
+                    Response = Self::Response,
+                    Error = Self::Error,
+                >,
             >,
         >,
+        AuthenticError,
     > {
-        None
+        Ok(None)
     }
 }
 
@@ -173,8 +178,12 @@ impl WithAuthentication<::reqwest::Request, ::reqwest::Response, ::reqwest::Erro
 }
 
 #[cfg(feature = "reqwest_blocking")]
-impl WithAuthentication<::reqwest::blocking::Request, ::reqwest::blocking::Response, ::reqwest::Error>
-    for ::reqwest::blocking::RequestBuilder
+impl
+    WithAuthentication<
+        ::reqwest::blocking::Request,
+        ::reqwest::blocking::Response,
+        ::reqwest::Error,
+    > for ::reqwest::blocking::RequestBuilder
 {
 }
 
@@ -215,13 +224,13 @@ where
         Error = Error,
     >,
 {
-    pub fn has_completed(&mut self, response: &Response) -> bool {
-        match self.switch(response) {
+    pub fn has_completed(&mut self, response: &Response) -> Result<bool, AuthenticError> {
+        match self.switch(response)? {
             Some(boxed) => {
                 *self = Scheme::Boxed(boxed);
-                false
+                Ok(false)
             }
-            None => true,
+            None => Ok(true),
         }
     }
 }
@@ -265,15 +274,18 @@ where
     fn switch(
         &mut self,
         response: &Self::Response,
-    ) -> Option<
-        Box<
-            dyn AuthenticationScheme<
-                Builder = Self::Builder,
-                Request = Self::Request,
-                Response = Self::Response,
-                Error = Self::Error,
+    ) -> Result<
+        Option<
+            Box<
+                dyn AuthenticationScheme<
+                    Builder = Self::Builder,
+                    Request = Self::Request,
+                    Response = Self::Response,
+                    Error = Self::Error,
+                >,
             >,
         >,
+        AuthenticError,
     > {
         match self {
             Scheme::Initial(scheme) => scheme.switch(response),

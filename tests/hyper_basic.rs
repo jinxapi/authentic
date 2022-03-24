@@ -1,6 +1,8 @@
 #![cfg(feature = "hyper")]
 
-use authentic::credential::UsernamePasswordCredential;
+use std::collections::HashMap;
+
+use authentic::credential::{HttpRealmCredential, UsernamePasswordCredential};
 use authentic::hyper::{BasicAuthentication, HttpAuthentication};
 use authentic::{AuthenticationScheme, AuthenticationStep, WithAuthentication};
 use http::StatusCode;
@@ -43,7 +45,7 @@ async fn test_basic_authentication(
 
         status_codes.push(response.status());
 
-        if scheme.has_completed(&response) {
+        if scheme.has_completed(&response)? {
             break response;
         }
     };
@@ -59,7 +61,12 @@ async fn test_basic_challenge() -> Result<(), Box<dyn std::error::Error + Send +
     let https = HttpsConnector::new();
     let client = Client::builder().build::<_, ::hyper::Body>(https);
 
-    let credential = UsernamePasswordCredential::new("username".into(), "password".into());
+    let mut realm_credentials = HashMap::new();
+    realm_credentials.insert(
+        "Fake Realm".into(),
+        UsernamePasswordCredential::new("username".into(), "password".into()),
+    );
+    let credential = HttpRealmCredential::new(realm_credentials);
     let mut scheme = HttpAuthentication::new(&credential).into_scheme();
 
     let mut status_codes = Vec::new();
@@ -88,7 +95,7 @@ async fn test_basic_challenge() -> Result<(), Box<dyn std::error::Error + Send +
 
         status_codes.push(response.status());
 
-        if scheme.has_completed(&response) {
+        if scheme.has_completed(&response)? {
             break response;
         }
     };

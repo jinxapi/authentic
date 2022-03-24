@@ -1,4 +1,5 @@
 use std::borrow::Cow;
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use crate::AuthenticationProcess;
@@ -63,3 +64,26 @@ impl AuthenticationCredentialUsernamePassword for UsernamePasswordCredential {
         self.current_password.as_ref()
     }
 }
+
+/// Credential mapping realms to username/password credentials.
+///
+/// For HTTP authentication, this selects the correct username/password credential for the realm
+/// returned by the `www-authenticate` header.
+pub struct HttpRealmCredential<Credential> {
+    realm_credentials: HashMap<Cow<'static, str>, Arc<Credential>>,
+}
+
+impl<Credential> HttpRealmCredential<Credential> {
+    pub fn new(
+        realm_credentials: HashMap<Cow<'static, str>, Arc<Credential>>,
+    ) -> Arc<HttpRealmCredential<Credential>> {
+        Arc::new(HttpRealmCredential { realm_credentials })
+    }
+
+    pub fn get_credential(&self, realm: &str) -> Option<&Arc<Credential>> {
+        self.realm_credentials.get(realm)
+    }
+}
+
+impl<Credential> AuthenticationProcess for HttpRealmCredential<Credential> {}
+impl<Credential> AuthenticationCredential for HttpRealmCredential<Credential> {}

@@ -4,8 +4,8 @@
 use std::borrow::Cow;
 use std::sync::Arc;
 
-use crate::credential::{AuthenticationCredentialToken, AuthenticationCredentialUsernamePassword};
-use crate::AuthenticationScheme;
+use crate::credential::{AuthenticationCredentialToken, AuthenticationCredentialUsernamePassword, HttpRealmCredential};
+use crate::{AuthenticationScheme, AuthenticError};
 
 #[cfg(feature = "reqwest_blocking")]
 pub mod blocking;
@@ -93,19 +93,15 @@ where
 
 /// Authentication using HTTP Basic authentication to respond to a challenge.
 ///
-/// This currently only supports Basic authentication and uses the provided username and
-/// password regardless of the `www-authenticate` header in the initial response.
+/// This currently only supports Basic authentication.
 ///
 /// This limitation is expected to be removed in a future version.
 pub struct HttpAuthentication<Credential> {
-    credential: Arc<Credential>,
+    credential: Arc<HttpRealmCredential<Credential>>,
 }
 
-impl<Credential> HttpAuthentication<Credential>
-where
-    Credential: AuthenticationCredentialUsernamePassword + 'static,
-{
-    pub fn new(credential: &Arc<Credential>) -> Self {
+impl<Credential> HttpAuthentication<Credential> {
+    pub fn new(credential: &Arc<HttpRealmCredential<Credential>>) -> Self {
         Self {
             credential: credential.clone(),
         }
@@ -124,21 +120,41 @@ where
     fn switch(
         &mut self,
         response: &Self::Response,
-    ) -> Option<
-        Box<
-            dyn AuthenticationScheme<
-                Builder = Self::Builder,
-                Request = Self::Request,
-                Response = Self::Response,
-                Error = Self::Error,
+    ) -> Result<
+        Option<
+            Box<
+                dyn AuthenticationScheme<
+                    Builder = Self::Builder,
+                    Request = Self::Request,
+                    Response = Self::Response,
+                    Error = Self::Error,
+                >,
             >,
         >,
+        AuthenticError,
     > {
         if response.status() == ::http::StatusCode::UNAUTHORIZED {
-            // TODO: handle www-authenticate, including realms and Digest
-            Some(Box::new(BasicAuthentication::new(&self.credential)))
+            let pw_client = ::http_auth::PasswordClient::try_from(
+                response
+                    .headers()
+                    .get_all(::hyper::header::WWW_AUTHENTICATE),
+            )
+            .map_err(AuthenticError::Other)?;
+            match pw_client {
+                http_auth::PasswordClient::Basic(client) => {
+                    let realm = client.realm();
+                    match self.credential.get_credential(realm) {
+                        Some(credential) => {
+                            Ok(Some(Box::new(BasicAuthentication::new(credential))))
+                        }
+                        None => Err(AuthenticError::UnknownRealm(realm.to_owned())),
+                    }
+                }
+                http_auth::PasswordClient::Digest(_) => todo!(),
+                _ => todo!(),
+            }
         } else {
-            None
+            Ok(None)
         }
     }
 }

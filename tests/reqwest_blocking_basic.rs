@@ -1,15 +1,16 @@
 #![cfg(feature = "reqwest_blocking")]
 
+use std::collections::HashMap;
+
 use ::reqwest::blocking::Client;
-use authentic::credential::UsernamePasswordCredential;
+use authentic::credential::{HttpRealmCredential, UsernamePasswordCredential};
 use authentic::reqwest::blocking::{BasicAuthentication, HttpAuthentication};
 use authentic::{AuthenticationScheme, AuthenticationStep, WithAuthentication};
 use http::StatusCode;
 
 /// Test direct basic authentication, passing the username and password on the first request.
 #[test]
-fn test_basic_authentication(
-) -> Result<(), Box<dyn std::error::Error>> {
+fn test_basic_authentication() -> Result<(), Box<dyn std::error::Error>> {
     let client = Client::new();
 
     let credential = UsernamePasswordCredential::new("username".into(), "password".into());
@@ -42,7 +43,7 @@ fn test_basic_authentication(
 
         status_codes.push(response.status());
 
-        if scheme.has_completed(&response) {
+        if scheme.has_completed(&response)? {
             break response;
         }
     };
@@ -57,7 +58,12 @@ fn test_basic_authentication(
 fn test_basic_challenge() -> Result<(), Box<dyn std::error::Error>> {
     let client = Client::new();
 
-    let credential = UsernamePasswordCredential::new("username".into(), "password".into());
+    let mut realm_credentials = HashMap::new();
+    realm_credentials.insert(
+        "Fake Realm".into(),
+        UsernamePasswordCredential::new("username".into(), "password".into()),
+    );
+    let credential = HttpRealmCredential::new(realm_credentials);
     let mut scheme = HttpAuthentication::new(&credential).into_scheme();
 
     let mut status_codes = Vec::new();
@@ -87,7 +93,7 @@ fn test_basic_challenge() -> Result<(), Box<dyn std::error::Error>> {
 
         status_codes.push(response.status());
 
-        if scheme.has_completed(&response) {
+        if scheme.has_completed(&response)? {
             break response;
         }
     };
