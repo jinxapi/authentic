@@ -8,7 +8,7 @@ use crate::credential::{
     AuthenticationCredentialToken, AuthenticationCredentialUsernamePassword, HttpRealmCredentials,
 };
 use crate::sensitive::SetSensitiveHeader;
-use crate::{AuthenticError, AuthenticationScheme};
+use crate::{AuthenticError, AuthenticationScheme, AuthenticationStep};
 
 /// No authentication scheme
 ///
@@ -96,15 +96,14 @@ where
 /// This currently only supports Basic authentication.
 ///
 /// This limitation is expected to be removed in a future version.
-pub struct HttpAuthentication<Credential> {
-    credential: Arc<HttpRealmCredentials<Credential>>,
+pub enum HttpAuthentication<Credential> {
+    Initial(Arc<HttpRealmCredentials<Credential>>),
+    Basic(BasicAuthentication<Credential>),
 }
 
 impl<Credential> HttpAuthentication<Credential> {
     pub fn new(credential: &Arc<HttpRealmCredentials<Credential>>) -> Self {
-        Self {
-            credential: credential.clone(),
-        }
+        Self::Initial(credential.clone())
     }
 }
 
@@ -117,44 +116,56 @@ where
     type Response = reqwest::blocking::Response;
     type Error = reqwest::Error;
 
-    fn switch(
-        &mut self,
-        response: &Self::Response,
-    ) -> Result<
-        Option<
-            Box<
-                dyn AuthenticationScheme<
-                    Builder = Self::Builder,
-                    Request = Self::Request,
-                    Response = Self::Response,
-                    Error = Self::Error,
-                >,
-            >,
-        >,
-        AuthenticError,
-    > {
-        if response.status() == ::http::StatusCode::UNAUTHORIZED {
-            let pw_client = ::http_auth::PasswordClient::try_from(
-                response
-                    .headers()
-                    .get_all(::hyper::header::WWW_AUTHENTICATE),
-            )
-            .map_err(AuthenticError::Other)?;
-            match pw_client {
-                http_auth::PasswordClient::Basic(client) => {
-                    let realm = client.realm();
-                    match self.credential.get_credential(realm) {
-                        Some(credential) => {
-                            Ok(Some(Box::new(BasicAuthentication::new(credential))))
+    fn step(&mut self) -> Option<AuthenticationStep<Self::Request>> {
+        match self {
+            Self::Initial(_) => None,
+            Self::Basic(basic) => basic.step(),
+        }
+    }
+
+    fn respond(&mut self, response: Result<Self::Response, Self::Error>) {
+        match self {
+            Self::Initial(_) => unimplemented!(),
+            Self::Basic(basic) => basic.respond(response),
+        }
+    }
+
+    fn configure(&self, builder: Self::Builder) -> Self::Builder {
+        match self {
+            Self::Initial(_) => builder,
+            Self::Basic(basic) => basic.configure(builder),
+        }
+    }
+
+    fn has_completed(&mut self, response: &Self::Response) -> Result<bool, AuthenticError> {
+        match self {
+            Self::Initial(realm_credentials) => {
+                if response.status() == ::http::StatusCode::UNAUTHORIZED {
+                    let pw_client = ::http_auth::PasswordClient::try_from(
+                        response
+                            .headers()
+                            .get_all(::hyper::header::WWW_AUTHENTICATE),
+                    )
+                    .map_err(AuthenticError::Other)?;
+                    match pw_client {
+                        http_auth::PasswordClient::Basic(client) => {
+                            let realm = client.realm();
+                            match realm_credentials.get_credential(realm) {
+                                Some(credential) => {
+                                    *self = Self::Basic(BasicAuthentication::new(credential));
+                                    Ok(false)
+                                }
+                                None => Err(AuthenticError::UnknownRealm(realm.to_owned())),
+                            }
                         }
-                        None => Err(AuthenticError::UnknownRealm(realm.to_owned())),
+                        http_auth::PasswordClient::Digest(_) => todo!(),
+                        _ => todo!(),
                     }
+                } else {
+                    Ok(true)
                 }
-                http_auth::PasswordClient::Digest(_) => todo!(),
-                _ => todo!(),
             }
-        } else {
-            Ok(None)
+            Self::Basic(basic) => basic.has_completed(response)
         }
     }
 }

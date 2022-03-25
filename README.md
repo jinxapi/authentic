@@ -20,7 +20,7 @@ realm_credentials.insert(
 let credential = HttpRealmCredentials::new(realm_credentials);
 
 // Per-request code:
-let mut scheme = HttpAuthentication::new(&credential).into_scheme();
+let mut scheme = HttpAuthentication::new(&credential);
 let response = loop {
     while let Some(auth_step) = scheme.step() {
         match auth_step {

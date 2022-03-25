@@ -20,7 +20,7 @@
 //! let credential = HttpRealmCredentials::new(realm_credentials);
 //!
 //! // Per-request code:
-//! let mut scheme = HttpAuthentication::new(&credential).into_scheme();
+//! let mut scheme = HttpAuthentication::new(&credential);
 //! let response = loop {
 //!     while let Some(auth_step) = scheme.step() {
 //!         match auth_step {
@@ -75,8 +75,17 @@ pub mod reqwest;
 
 #[derive(Error, Debug)]
 pub enum AuthenticError {
+    #[cfg(feature = "hyper")]
+    #[error("Hyper error")]
+    Hyper(#[from] ::hyper::Error),
+
+    #[cfg(feature = "reqwest")]
+    #[error("Reqwest error")]
+    Reqwest(#[from] ::reqwest::Error),
+
     #[error("No credentials found for realm {0:?}")]
     UnknownRealm(String),
+
     #[error("{0}")]
     Other(String),
 }
@@ -105,13 +114,6 @@ pub trait AuthenticationScheme {
     type Response;
     type Error;
 
-    fn into_scheme(self) -> Scheme<Self, Self::Builder, Self::Request, Self::Response, Self::Error>
-    where
-        Self: Sized,
-    {
-        Scheme::Initial(self)
-    }
-
     fn step(&mut self) -> Option<AuthenticationStep<Self::Request>> {
         None
     }
@@ -120,31 +122,18 @@ pub trait AuthenticationScheme {
         &mut self,
         #[allow(unused_variables)] response: Result<Self::Response, Self::Error>,
     ) {
-        panic!("Unexpected auth response");
+        unimplemented!();
     }
 
     fn configure(&self, builder: Self::Builder) -> Self::Builder {
         builder
     }
 
-    #[allow(clippy::type_complexity)]
-    fn switch(
+    fn has_completed(
         &mut self,
         #[allow(unused_variables)] response: &Self::Response,
-    ) -> Result<
-        Option<
-            Box<
-                dyn AuthenticationScheme<
-                    Builder = Self::Builder,
-                    Request = Self::Request,
-                    Response = Self::Response,
-                    Error = Self::Error,
-                >,
-            >,
-        >,
-        AuthenticError,
-    > {
-        Ok(None)
+    ) -> Result<bool, AuthenticError> {
+        Ok(true)
     }
 }
 
@@ -191,112 +180,4 @@ impl
         ::reqwest::Error,
     > for ::reqwest::blocking::RequestBuilder
 {
-}
-
-/// Type to allow initial scheme to avoid allocation.
-///
-/// Switching uses boxed trait objects to allow the scheme to be changed.  However, this
-/// allocates even for simple schemes that never switch.
-///
-/// Scheme is an enum containing the initial scheme or a boxed trait object.
-pub enum Scheme<Initial, Builder, Request, Response, Error>
-where
-    Initial: AuthenticationScheme<
-        Builder = Builder,
-        Request = Request,
-        Response = Response,
-        Error = Error,
-    >,
-{
-    Initial(Initial),
-    Boxed(
-        Box<
-            dyn AuthenticationScheme<
-                Builder = Builder,
-                Request = Request,
-                Response = Response,
-                Error = Error,
-            >,
-        >,
-    ),
-}
-
-impl<Initial, Builder, Request, Response, Error> Scheme<Initial, Builder, Request, Response, Error>
-where
-    Initial: AuthenticationScheme<
-        Builder = Builder,
-        Request = Request,
-        Response = Response,
-        Error = Error,
-    >,
-{
-    pub fn has_completed(&mut self, response: &Response) -> Result<bool, AuthenticError> {
-        match self.switch(response)? {
-            Some(boxed) => {
-                *self = Scheme::Boxed(boxed);
-                Ok(false)
-            }
-            None => Ok(true),
-        }
-    }
-}
-
-impl<T, Builder, Request, Response, Error> AuthenticationScheme
-    for Scheme<T, Builder, Request, Response, Error>
-where
-    T: AuthenticationScheme<
-        Builder = Builder,
-        Request = Request,
-        Response = Response,
-        Error = Error,
-    >,
-{
-    type Builder = Builder;
-    type Request = Request;
-    type Response = Response;
-    type Error = Error;
-
-    fn step(&mut self) -> Option<AuthenticationStep<Self::Request>> {
-        match self {
-            Scheme::Initial(scheme) => scheme.step(),
-            Scheme::Boxed(scheme) => scheme.step(),
-        }
-    }
-
-    fn respond(&mut self, response: Result<Self::Response, Self::Error>) {
-        match self {
-            Scheme::Initial(scheme) => scheme.respond(response),
-            Scheme::Boxed(scheme) => scheme.respond(response),
-        }
-    }
-
-    fn configure(&self, builder: Self::Builder) -> Self::Builder {
-        match self {
-            Scheme::Initial(scheme) => scheme.configure(builder),
-            Scheme::Boxed(scheme) => scheme.configure(builder),
-        }
-    }
-
-    #[allow(clippy::type_complexity)]
-    fn switch(
-        &mut self,
-        response: &Self::Response,
-    ) -> Result<
-        Option<
-            Box<
-                dyn AuthenticationScheme<
-                    Builder = Self::Builder,
-                    Request = Self::Request,
-                    Response = Self::Response,
-                    Error = Self::Error,
-                >,
-            >,
-        >,
-        AuthenticError,
-    > {
-        match self {
-            Scheme::Initial(scheme) => scheme.switch(response),
-            Scheme::Boxed(scheme) => scheme.switch(response),
-        }
-    }
 }

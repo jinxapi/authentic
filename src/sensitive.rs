@@ -66,9 +66,6 @@ where
 //
 // However, for consistency, use the same solution as reqwest. It's fast when TryFrom
 // succeeds.
-//
-// For hyper, support Clone rather than Copy to make it easier to implement sensitive
-// for Basic Auth when passing a String.
 #[cfg(feature = "hyper")]
 impl<V> SetSensitiveHeader<V> for ::http::request::Builder
 where

@@ -14,7 +14,7 @@ fn test_basic_authentication() -> Result<(), Box<dyn std::error::Error>> {
     let client = Client::new();
 
     let credential = UsernamePasswordCredential::new("username", "password");
-    let mut scheme = BasicAuthentication::new(&credential).into_scheme();
+    let mut scheme = BasicAuthentication::new(&credential);
 
     let mut status_codes = Vec::new();
 
@@ -64,7 +64,7 @@ fn test_basic_challenge() -> Result<(), Box<dyn std::error::Error>> {
         UsernamePasswordCredential::new("username", "password"),
     );
     let credential = HttpRealmCredentials::new(realm_credentials);
-    let mut scheme = HttpAuthentication::new(&credential).into_scheme();
+    let mut scheme = HttpAuthentication::new(&credential);
 
     let mut status_codes = Vec::new();
 
