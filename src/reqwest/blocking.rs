@@ -4,9 +4,11 @@
 use std::borrow::Cow;
 use std::sync::Arc;
 
-use crate::credential::{AuthenticationCredentialToken, AuthenticationCredentialUsernamePassword, HttpRealmCredentials};
+use crate::credential::{
+    AuthenticationCredentialToken, AuthenticationCredentialUsernamePassword, HttpRealmCredentials,
+};
 use crate::sensitive::SetSensitiveHeader;
-use crate::{AuthenticationScheme, AuthenticError};
+use crate::{AuthenticError, AuthenticationScheme};
 
 /// No authentication scheme
 ///

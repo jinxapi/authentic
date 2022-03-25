@@ -1,5 +1,5 @@
-use http::HeaderValue;
 use http::header::HeaderName;
+use http::HeaderValue;
 
 pub trait SetSensitiveHeader<V> {
     fn set_sensitive_header<K>(self, key: K, value: V) -> Self
@@ -17,7 +17,10 @@ pub trait SetSensitiveHeader<V> {
 // but closed issue: https://github.com/seanmonstar/reqwest/issues/1378
 
 #[cfg(feature = "reqwest")]
-impl<V> SetSensitiveHeader<V> for reqwest::RequestBuilder where V: Copy {
+impl<V> SetSensitiveHeader<V> for reqwest::RequestBuilder
+where
+    V: Copy,
+{
     fn set_sensitive_header<K>(self, key: K, value: V) -> Self
     where
         HeaderName: TryFrom<K>,
@@ -36,7 +39,10 @@ impl<V> SetSensitiveHeader<V> for reqwest::RequestBuilder where V: Copy {
 }
 
 #[cfg(feature = "reqwest_blocking")]
-impl<V> SetSensitiveHeader<V> for reqwest::blocking::RequestBuilder where V: Copy {
+impl<V> SetSensitiveHeader<V> for reqwest::blocking::RequestBuilder
+where
+    V: Copy,
+{
     fn set_sensitive_header<K>(self, key: K, value: V) -> Self
     where
         HeaderName: TryFrom<K>,
@@ -64,7 +70,10 @@ impl<V> SetSensitiveHeader<V> for reqwest::blocking::RequestBuilder where V: Cop
 // For hyper, support Clone rather than Copy to make it easier to implement sensitive
 // for Basic Auth when passing a String.
 #[cfg(feature = "hyper")]
-impl<V> SetSensitiveHeader<V> for ::http::request::Builder where V: Copy {
+impl<V> SetSensitiveHeader<V> for ::http::request::Builder
+where
+    V: Copy,
+{
     fn set_sensitive_header<K>(self, key: K, value: V) -> Self
     where
         HeaderName: TryFrom<K>,

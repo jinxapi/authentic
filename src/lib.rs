@@ -277,6 +277,7 @@ where
         }
     }
 
+    #[allow(clippy::type_complexity)]
     fn switch(
         &mut self,
         response: &Self::Response,
