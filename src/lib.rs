@@ -66,6 +66,7 @@ use std::time::Duration;
 use thiserror::Error;
 
 pub mod credential;
+mod sensitive;
 
 #[cfg(feature = "hyper")]
 pub mod hyper;

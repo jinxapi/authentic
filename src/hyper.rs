@@ -7,6 +7,7 @@ use std::sync::Arc;
 use crate::credential::{
     AuthenticationCredentialToken, AuthenticationCredentialUsernamePassword, HttpRealmCredentials,
 };
+use crate::sensitive::SetSensitiveHeader;
 use crate::{AuthenticError, AuthenticationScheme};
 
 /// No authentication scheme
@@ -56,7 +57,7 @@ where
     type Error = hyper::Error;
 
     fn configure(&self, builder: Self::Builder) -> Self::Builder {
-        builder.header(self.header_name.as_ref(), self.credential.token())
+        builder.set_sensitive_header(self.header_name.as_ref(), self.credential.token())
     }
 }
 
@@ -86,11 +87,11 @@ where
     type Error = hyper::Error;
 
     fn configure(&self, builder: Self::Builder) -> Self::Builder {
-        let header_value = ::http_auth::basic::encode_credentials(
+        let value = ::http_auth::basic::encode_credentials(
             self.credential.username(),
             self.credential.password(),
         );
-        builder.header(hyper::header::AUTHORIZATION, header_value)
+        builder.set_sensitive_header(hyper::header::AUTHORIZATION, &value)
     }
 }
 

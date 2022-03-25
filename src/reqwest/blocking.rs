@@ -5,6 +5,7 @@ use std::borrow::Cow;
 use std::sync::Arc;
 
 use crate::credential::{AuthenticationCredentialToken, AuthenticationCredentialUsernamePassword, HttpRealmCredentials};
+use crate::sensitive::SetSensitiveHeader;
 use crate::{AuthenticationScheme, AuthenticError};
 
 /// No authentication scheme
@@ -54,7 +55,7 @@ where
     type Error = reqwest::Error;
 
     fn configure(&self, builder: Self::Builder) -> Self::Builder {
-        builder.header(self.header_name.as_ref(), self.credential.token())
+        builder.set_sensitive_header(self.header_name.as_ref(), self.credential.token())
     }
 }
 

@@ -4,8 +4,11 @@
 use std::borrow::Cow;
 use std::sync::Arc;
 
-use crate::credential::{AuthenticationCredentialToken, AuthenticationCredentialUsernamePassword, HttpRealmCredentials};
-use crate::{AuthenticationScheme, AuthenticError};
+use crate::credential::{
+    AuthenticationCredentialToken, AuthenticationCredentialUsernamePassword, HttpRealmCredentials,
+};
+use crate::sensitive::SetSensitiveHeader;
+use crate::{AuthenticError, AuthenticationScheme};
 
 #[cfg(feature = "reqwest_blocking")]
 pub mod blocking;
@@ -57,7 +60,7 @@ where
     type Error = reqwest::Error;
 
     fn configure(&self, builder: Self::Builder) -> Self::Builder {
-        builder.header(self.header_name.as_ref(), self.credential.token())
+        builder.set_sensitive_header(self.header_name.as_ref(), self.credential.token())
     }
 }
 
