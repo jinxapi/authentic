@@ -29,7 +29,7 @@ impl AuthenticationScheme for NoAuthentication {
     type Error = hyper::Error;
 }
 
-/// Authentication using a token in a specified haeader.
+/// Authentication using a token in a specified header.
 pub struct HeaderAuthentication<Credential> {
     header_name: Cow<'static, [u8]>,
     credential: Arc<Credential>,
@@ -58,6 +58,52 @@ where
 
     fn configure(&self, builder: Self::Builder) -> Self::Builder {
         builder.set_sensitive_header(self.header_name.as_ref(), self.credential.token())
+    }
+}
+
+/// Authentication using a bearer token in the HTTP Authorization header.
+pub struct BearerAuthentication<Credential> {
+    scheme_name: Cow<'static, [u8]>,
+    credential: Arc<Credential>,
+}
+
+impl<Credential: 'static> BearerAuthentication<Credential>
+where
+    Credential: AuthenticationCredentialToken,
+{
+    pub fn new(credential: &Arc<Credential>) -> Self {
+        Self {
+            scheme_name: b"Bearer"[..].into(),
+            credential: credential.clone(),
+        }
+    }
+
+    /// Change the default `Bearer` scheme to another string.
+    ///
+    /// Some systems use a bearer token, but use a scheme name other
+    /// than `Bearer`.
+    pub fn with_name(mut self, name: Cow<'static, [u8]>) -> Self {
+        self.scheme_name = name;
+        self
+    }
+}
+
+impl<Credential> AuthenticationScheme for BearerAuthentication<Credential>
+where
+    Credential: AuthenticationCredentialToken,
+{
+    type Builder = http::request::Builder;
+    type Request = hyper::Request<hyper::Body>;
+    type Response = hyper::Response<hyper::Body>;
+    type Error = hyper::Error;
+
+    fn configure(&self, builder: Self::Builder) -> Self::Builder {
+        let token = self.credential.token();
+        let mut value = Vec::with_capacity(self.scheme_name.len() + 1 + token.len());
+        value.extend(self.scheme_name.as_ref());
+        value.push(b' ');
+        value.extend(token);
+        builder.set_sensitive_header(hyper::header::AUTHORIZATION, &value[..])
     }
 }
 
@@ -169,7 +215,7 @@ where
                     Ok(true)
                 }
             }
-            Self::Basic(basic) => basic.has_completed(response)
+            Self::Basic(basic) => basic.has_completed(response),
         }
     }
 }
