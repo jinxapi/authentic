@@ -63,7 +63,7 @@ where
 
 /// Authentication using a bearer token in the HTTP Authorization header.
 pub struct BearerAuthentication<Credential> {
-    scheme_name: Cow<'static, [u8]>,
+    scheme_name: Cow<'static, str>,
     credential: Arc<Credential>,
 }
 
@@ -73,7 +73,7 @@ where
 {
     pub fn new(credential: &Arc<Credential>) -> Self {
         Self {
-            scheme_name: b"Bearer"[..].into(),
+            scheme_name: "Bearer".into(),
             credential: credential.clone(),
         }
     }
@@ -82,8 +82,8 @@ where
     ///
     /// Some systems use a bearer token, but use a scheme name other
     /// than `Bearer`.
-    pub fn with_name(mut self, name: Cow<'static, [u8]>) -> Self {
-        self.scheme_name = name;
+    pub fn with_name(mut self, name: impl Into<Cow<'static, str>>) -> Self {
+        self.scheme_name = name.into();
         self
     }
 }
@@ -100,7 +100,7 @@ where
     fn configure(&self, builder: Self::Builder) -> Self::Builder {
         let token = self.credential.token();
         let mut value = Vec::with_capacity(self.scheme_name.len() + 1 + token.len());
-        value.extend(self.scheme_name.as_ref());
+        value.extend(self.scheme_name.as_bytes());
         value.push(b' ');
         value.extend(token);
         builder.set_sensitive_header(hyper::header::AUTHORIZATION, &value[..])

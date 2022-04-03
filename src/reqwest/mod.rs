@@ -66,7 +66,7 @@ where
 
 /// Authentication using a bearer token in the HTTP Authorization header.
 pub struct BearerAuthentication<Credential> {
-    scheme_name: Option<Cow<'static, [u8]>>,
+    scheme_name: Cow<'static, str>,
     credential: Arc<Credential>,
 }
 
@@ -76,7 +76,7 @@ where
 {
     pub fn new(credential: &Arc<Credential>) -> Self {
         Self {
-            scheme_name: None,
+            scheme_name: "Bearer".into(),
             credential: credential.clone(),
         }
     }
@@ -85,8 +85,8 @@ where
     ///
     /// Some systems use a bearer token, but use a scheme name other
     /// than `Bearer`.
-    pub fn with_name(mut self, name: Cow<'static, [u8]>) -> Self {
-        self.scheme_name = Some(name);
+    pub fn with_name(mut self, name: impl Into<Cow<'static, str>>) -> Self {
+        self.scheme_name = name.into();
         self
     }
 }
@@ -95,23 +95,18 @@ impl<Credential> AuthenticationScheme for BearerAuthentication<Credential>
 where
     Credential: AuthenticationCredentialToken,
 {
-    type Builder = http::request::Builder;
-    type Request = hyper::Request<hyper::Body>;
-    type Response = hyper::Response<hyper::Body>;
-    type Error = hyper::Error;
+    type Builder = reqwest::RequestBuilder;
+    type Request = reqwest::Request;
+    type Response = reqwest::Response;
+    type Error = reqwest::Error;
 
     fn configure(&self, builder: Self::Builder) -> Self::Builder {
         let token = self.credential.token();
-        match self.scheme_name {
-            None => builder.bearer_auth(token),
-            Some(name) => {
-                let mut value = Vec::with_capacity(name.len() + 1 + token.len());
-                value.extend(name.as_ref());
-                value.push(b' ');
-                value.extend(token);
-                builder.set_sensitive_header(hyper::header::AUTHORIZATION, &value[..])
-            }
-        }
+        let mut value = Vec::with_capacity(self.scheme_name.len() + 1 + token.len());
+        value.extend(self.scheme_name.as_bytes());
+        value.push(b' ');
+        value.extend(token);
+        builder.set_sensitive_header(hyper::header::AUTHORIZATION, &value[..])
     }
 }
 
