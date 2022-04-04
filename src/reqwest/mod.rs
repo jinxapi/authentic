@@ -42,9 +42,9 @@ impl<Credential: 'static> HeaderAuthentication<Credential>
 where
     Credential: AuthenticationCredentialToken,
 {
-    pub fn new(header_name: Cow<'static, str>, credential: &Arc<Credential>) -> Self {
+    pub fn new(header_name: impl Into<Cow<'static, str>>, credential: &Arc<Credential>) -> Self {
         Self {
-            header_name,
+            header_name: header_name.into(),
             credential: credential.clone(),
         }
     }
