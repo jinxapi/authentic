@@ -1,4 +1,4 @@
-//! Authentication schemes for use with `reqwest`.
+//! Authentication protocols for use with `reqwest`.
 //! Use the `reqwest_async` feature to enable these.
 
 use std::borrow::Cow;
@@ -8,14 +8,14 @@ use crate::credential::{
     AuthenticationCredentialToken, AuthenticationCredentialUsernamePassword, HttpRealmCredentials,
 };
 use crate::sensitive::SetSensitiveHeader;
-use crate::{AuthenticError, AuthenticationScheme, AuthenticationStep};
+use crate::{AuthenticError, AuthenticationProtocol, AuthenticationStep};
 
 #[cfg(feature = "reqwest_blocking")]
 pub mod blocking;
 
-/// No authentication scheme
+/// Protocol for no authentication
 ///
-/// Identical to not using `authentic` but allows minimal code changes when changing schemes.
+/// Identical to not using `authentic` but allows minimal code changes when changing protocols.
 pub struct NoAuthentication;
 
 impl NoAuthentication {
@@ -25,7 +25,7 @@ impl NoAuthentication {
     }
 }
 
-impl AuthenticationScheme for NoAuthentication {
+impl AuthenticationProtocol for NoAuthentication {
     type Builder = reqwest::RequestBuilder;
     type Request = reqwest::Request;
     type Response = reqwest::Response;
@@ -50,7 +50,7 @@ where
     }
 }
 
-impl<Credential> AuthenticationScheme for HeaderAuthentication<Credential>
+impl<Credential> AuthenticationProtocol for HeaderAuthentication<Credential>
 where
     Credential: AuthenticationCredentialToken,
 {
@@ -66,7 +66,7 @@ where
 
 /// Authentication using a bearer token in the HTTP Authorization header.
 pub struct BearerAuthentication<Credential> {
-    scheme_name: Cow<'static, str>,
+    auth_scheme: Cow<'static, str>,
     credential: Arc<Credential>,
 }
 
@@ -76,7 +76,7 @@ where
 {
     pub fn new(credential: &Arc<Credential>) -> Self {
         Self {
-            scheme_name: "Bearer".into(),
+            auth_scheme: "Bearer".into(),
             credential: credential.clone(),
         }
     }
@@ -85,13 +85,13 @@ where
     ///
     /// Some systems use a bearer token, but use a scheme name other
     /// than `Bearer`.
-    pub fn with_name(mut self, name: impl Into<Cow<'static, str>>) -> Self {
-        self.scheme_name = name.into();
+    pub fn with_auth_scheme(mut self, auth_scheme: impl Into<Cow<'static, str>>) -> Self {
+        self.auth_scheme = auth_scheme.into();
         self
     }
 }
 
-impl<Credential> AuthenticationScheme for BearerAuthentication<Credential>
+impl<Credential> AuthenticationProtocol for BearerAuthentication<Credential>
 where
     Credential: AuthenticationCredentialToken,
 {
@@ -102,8 +102,8 @@ where
 
     fn configure(&self, builder: Self::Builder) -> Self::Builder {
         let token = self.credential.token();
-        let mut value = Vec::with_capacity(self.scheme_name.len() + 1 + token.len());
-        value.extend(self.scheme_name.as_bytes());
+        let mut value = Vec::with_capacity(self.auth_scheme.len() + 1 + token.len());
+        value.extend(self.auth_scheme.as_bytes());
         value.push(b' ');
         value.extend(token);
         builder.set_sensitive_header(hyper::header::AUTHORIZATION, &value[..])
@@ -126,7 +126,7 @@ where
     }
 }
 
-impl<Credential> AuthenticationScheme for BasicAuthentication<Credential>
+impl<Credential> AuthenticationProtocol for BasicAuthentication<Credential>
 where
     Credential: AuthenticationCredentialUsernamePassword,
 {
@@ -156,7 +156,7 @@ impl<Credential> HttpAuthentication<Credential> {
     }
 }
 
-impl<Credential> AuthenticationScheme for HttpAuthentication<Credential>
+impl<Credential> AuthenticationProtocol for HttpAuthentication<Credential>
 where
     Credential: AuthenticationCredentialUsernamePassword + 'static,
 {

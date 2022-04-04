@@ -5,7 +5,7 @@ use std::collections::HashMap;
 use ::reqwest::blocking::Client;
 use authentic::credential::{HttpRealmCredentials, UsernamePasswordCredential};
 use authentic::reqwest::blocking::{BasicAuthentication, HttpAuthentication};
-use authentic::{AuthenticationScheme, AuthenticationStep, WithAuthentication};
+use authentic::{AuthenticationProtocol, AuthenticationStep, WithAuthentication};
 use http::StatusCode;
 
 /// Direct basic authentication, passing the username and password on the first request.
