@@ -4,7 +4,7 @@ use std::collections::HashMap;
 
 use authentic::credential::{HttpRealmCredentials, UsernamePasswordCredential};
 use authentic::hyper::{BasicAuthentication, HttpAuthentication};
-use authentic::{AuthenticationScheme, AuthenticationStep, WithAuthentication};
+use authentic::{AuthenticationProtocol, AuthenticationStep, WithAuthentication};
 use http::StatusCode;
 use hyper::Client;
 use hyper_tls::HttpsConnector;
