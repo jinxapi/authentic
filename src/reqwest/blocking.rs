@@ -31,7 +31,7 @@ impl AuthenticationProtocol for NoAuthentication {
 
 /// Authentication using a token in a specified header.
 pub struct HeaderAuthentication<Credential> {
-    header_name: Cow<'static, [u8]>,
+    header_name: Cow<'static, str>,
     credential: Arc<Credential>,
 }
 
@@ -39,7 +39,7 @@ impl<Credential: 'static> HeaderAuthentication<Credential>
 where
     Credential: AuthenticationCredentialToken,
 {
-    pub fn new(header_name: Cow<'static, [u8]>, credential: &Arc<Credential>) -> Self {
+    pub fn new(header_name: Cow<'static, str>, credential: &Arc<Credential>) -> Self {
         Self {
             header_name,
             credential: credential.clone(),
