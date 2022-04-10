@@ -4,10 +4,11 @@
 use std::borrow::Cow;
 use std::sync::Arc;
 
+use http::HeaderValue;
+
 use crate::credential::{
     AuthenticationCredentialToken, AuthenticationCredentialUsernamePassword, HttpRealmCredentials,
 };
-use crate::sensitive::SetSensitiveHeader;
 use crate::{AuthenticError, AuthenticationProtocol, AuthenticationStep};
 
 /// Protocol for no authentication
@@ -27,6 +28,7 @@ impl AuthenticationProtocol for NoAuthentication {
     type Request = hyper::Request<hyper::Body>;
     type Response = hyper::Response<hyper::Body>;
     type Error = hyper::Error;
+    type ConfigError = hyper::header::InvalidHeaderValue;
 }
 
 /// Authentication using a token in a specified header.
@@ -55,9 +57,12 @@ where
     type Request = hyper::Request<hyper::Body>;
     type Response = hyper::Response<hyper::Body>;
     type Error = hyper::Error;
+    type ConfigError = hyper::header::InvalidHeaderValue;
 
-    fn configure(&self, builder: Self::Builder) -> Self::Builder {
-        builder.set_sensitive_header(self.header_name.as_ref(), self.credential.token())
+    fn configure(&self, builder: Self::Builder) -> Result<Self::Builder, Self::ConfigError> {
+        let mut header_value = HeaderValue::try_from(self.credential.token())?;
+        header_value.set_sensitive(true);
+        Ok(builder.header(self.header_name.as_ref(), header_value))
     }
 }
 
@@ -96,14 +101,17 @@ where
     type Request = hyper::Request<hyper::Body>;
     type Response = hyper::Response<hyper::Body>;
     type Error = hyper::Error;
+    type ConfigError = hyper::header::InvalidHeaderValue;
 
-    fn configure(&self, builder: Self::Builder) -> Self::Builder {
+    fn configure(&self, builder: Self::Builder) -> Result<Self::Builder, Self::ConfigError> {
         let token = self.credential.token();
         let mut value = Vec::with_capacity(self.auth_scheme.len() + 1 + token.len());
         value.extend(self.auth_scheme.as_bytes());
         value.push(b' ');
         value.extend(token);
-        builder.set_sensitive_header(hyper::header::AUTHORIZATION, &value[..])
+        let mut header_value = HeaderValue::try_from(value)?;
+        header_value.set_sensitive(true);
+        Ok(builder.header(hyper::header::AUTHORIZATION, header_value))
     }
 }
 
@@ -131,13 +139,16 @@ where
     type Request = hyper::Request<hyper::Body>;
     type Response = hyper::Response<hyper::Body>;
     type Error = hyper::Error;
+    type ConfigError = hyper::header::InvalidHeaderValue;
 
-    fn configure(&self, builder: Self::Builder) -> Self::Builder {
+    fn configure(&self, builder: Self::Builder) -> Result<Self::Builder, Self::ConfigError> {
         let value = ::http_auth::basic::encode_credentials(
             self.credential.username(),
             self.credential.password(),
         );
-        builder.set_sensitive_header(hyper::header::AUTHORIZATION, &value)
+        let mut header_value = HeaderValue::try_from(value)?;
+        header_value.set_sensitive(true);
+        Ok(builder.header(hyper::header::AUTHORIZATION, header_value))
     }
 }
 
@@ -165,6 +176,7 @@ where
     type Request = hyper::Request<hyper::Body>;
     type Response = hyper::Response<hyper::Body>;
     type Error = hyper::Error;
+    type ConfigError = hyper::header::InvalidHeaderValue;
 
     fn step(&mut self) -> Option<AuthenticationStep<Self::Request>> {
         match self {
@@ -180,9 +192,9 @@ where
         }
     }
 
-    fn configure(&self, builder: Self::Builder) -> Self::Builder {
+    fn configure(&self, builder: Self::Builder) -> Result<Self::Builder, Self::ConfigError> {
         match self {
-            Self::Initial(_) => builder,
+            Self::Initial(_) => Ok(builder),
             Self::Basic(basic) => basic.configure(builder),
         }
     }

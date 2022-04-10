@@ -36,8 +36,8 @@
 //!
 //!     let request = client
 //!         .get("https://httpbin.org/basic-auth/username/password")
-//!         .with_authentication(&scheme)
-//!         .build()?;
+//!         .build()?
+//!         .with_authentication(&scheme)?;
 //!
 //!     let response = client.execute(request)?;
 //!
@@ -50,7 +50,7 @@
 //! The creation of the request takes place inside a loop. First, the authentication protocol is given an opportunity to perform any third-party calls using `step()`.
 //! HTTP Basic authentication does not use this, but it can be used, for example, to refresh an expired OAuth2 access token.
 //!
-//! The request is created using a standard `reqwest` RequestBuilder, using a new `with_authentication()` method to modify the request for the authentication protocol.
+//! The request is created using a standard `reqwest` Request, using a new `with_authentication()` method to modify the request for the authentication protocol.
 //! For HTTP authentication, the first iteration makes no change to the request.
 //!
 //! The request is sent and a response is received.  For HTTP authentication, this returns a `401 Unauthorized` response.
@@ -66,7 +66,6 @@ use std::time::Duration;
 use thiserror::Error;
 
 pub mod credential;
-mod sensitive;
 
 #[cfg(feature = "hyper")]
 pub mod hyper;
@@ -113,6 +112,7 @@ pub trait AuthenticationProtocol {
     type Request;
     type Response;
     type Error;
+    type ConfigError;
 
     fn step(&mut self) -> Option<AuthenticationStep<Self::Request>> {
         None
@@ -125,8 +125,8 @@ pub trait AuthenticationProtocol {
         unimplemented!();
     }
 
-    fn configure(&self, builder: Self::Builder) -> Self::Builder {
-        builder
+    fn configure(&self, builder: Self::Builder) -> Result<Self::Builder, Self::ConfigError> {
+        Ok(builder)
     }
 
     fn has_completed(
@@ -138,7 +138,7 @@ pub trait AuthenticationProtocol {
 }
 
 // Allow request builder authentication to use fluent model.
-pub trait WithAuthentication<Request, Response, Error>
+pub trait WithAuthentication<Request, Response, Error, ConfigError>
 where
     Self: Sized,
 {
@@ -150,8 +150,9 @@ where
             Request = Request,
             Response = Response,
             Error = Error,
+            ConfigError = ConfigError,
         >,
-    ) -> Self {
+    ) -> Result<Self, ConfigError> {
         protocol.configure(self)
     }
 }
@@ -162,13 +163,19 @@ impl
         ::hyper::Request<::hyper::Body>,
         ::hyper::Response<::hyper::Body>,
         ::hyper::Error,
+        ::hyper::header::InvalidHeaderValue,
     > for http::request::Builder
 {
 }
 
 #[cfg(feature = "reqwest")]
-impl WithAuthentication<::reqwest::Request, ::reqwest::Response, ::reqwest::Error>
-    for ::reqwest::RequestBuilder
+impl
+    WithAuthentication<
+        ::reqwest::Request,
+        ::reqwest::Response,
+        ::reqwest::Error,
+        reqwest::ReqwestConfigError,
+    > for ::reqwest::Request
 {
 }
 
@@ -178,6 +185,7 @@ impl
         ::reqwest::blocking::Request,
         ::reqwest::blocking::Response,
         ::reqwest::Error,
-    > for ::reqwest::blocking::RequestBuilder
+        reqwest::ReqwestConfigError,
+    > for ::reqwest::blocking::Request
 {
 }

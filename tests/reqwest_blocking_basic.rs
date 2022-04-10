@@ -32,8 +32,8 @@ fn test_basic_authentication() -> Result<(), Box<dyn std::error::Error>> {
         }
         let request = client
             .get("https://httpbin.org/basic-auth/username/password")
-            .with_authentication(&scheme)
-            .build()?;
+            .build()?
+            .with_authentication(&scheme)?;
 
         dbg!(&request);
 
@@ -82,8 +82,8 @@ fn test_basic_challenge() -> Result<(), Box<dyn std::error::Error>> {
         }
         let request = client
             .get("https://httpbin.org/basic-auth/username/password")
-            .with_authentication(&scheme)
-            .build()?;
+            .build()?
+            .with_authentication(&scheme)?;
 
         dbg!(&request);
 
