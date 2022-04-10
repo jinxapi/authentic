@@ -20,13 +20,13 @@
 //! let credential = HttpRealmCredentials::new(realm_credentials);
 //!
 //! // Per-request code:
-//! let mut scheme = HttpAuthentication::new(&credential);
+//! let mut authentication = HttpAuthentication::new(&credential);
 //! let response = loop {
-//!     while let Some(auth_step) = scheme.step() {
+//!     while let Some(auth_step) = authentication.step() {
 //!         match auth_step {
 //!             AuthenticationStep::Request(request) => {
 //!                 let auth_response = client.execute(request);
-//!                 scheme.respond(auth_response);
+//!                 authentication.respond(auth_response);
 //!             }
 //!             AuthenticationStep::WaitFor(duration) => {
 //!                 std::thread::sleep(duration);
@@ -34,14 +34,12 @@
 //!         }
 //!     }
 //!
-//!     let request = client
-//!         .get("https://httpbin.org/basic-auth/username/password")
-//!         .build()?
-//!         .with_authentication(&scheme)?;
+//!    let response = client
+//!        .get("https://httpbin.org/basic-auth/username/password")
+//!        .with_authentication(&authentication)?
+//!        .send()?;
 //!
-//!     let response = client.execute(request)?;
-//!
-//!     if scheme.has_completed(&response)? {
+//!     if authentication.has_completed(&response)? {
 //!         break response;
 //!     }
 //! };
@@ -50,7 +48,7 @@
 //! The creation of the request takes place inside a loop. First, the authentication protocol is given an opportunity to perform any third-party calls using `step()`.
 //! HTTP Basic authentication does not use this, but it can be used, for example, to refresh an expired OAuth2 access token.
 //!
-//! The request is created using a standard `reqwest` Request, using a new `with_authentication()` method to modify the request for the authentication protocol.
+//! The request is created using a standard `reqwest::RequestBuilder`, using a new `with_authentication()` method to modify the request for the authentication protocol.
 //! For HTTP authentication, the first iteration makes no change to the request.
 //!
 //! The request is sent and a response is received.  For HTTP authentication, this returns a `401 Unauthorized` response.
@@ -108,11 +106,9 @@ pub trait AuthenticationProcess {
 }
 
 pub trait AuthenticationProtocol {
-    type Builder;
     type Request;
     type Response;
     type Error;
-    type ConfigError;
 
     fn step(&mut self) -> Option<AuthenticationStep<Self::Request>> {
         None
@@ -125,10 +121,6 @@ pub trait AuthenticationProtocol {
         unimplemented!();
     }
 
-    fn configure(&self, builder: Self::Builder) -> Result<Self::Builder, Self::ConfigError> {
-        Ok(builder)
-    }
-
     fn has_completed(
         &mut self,
         #[allow(unused_variables)] response: &Self::Response,
@@ -137,54 +129,38 @@ pub trait AuthenticationProtocol {
     }
 }
 
-// Allow request builder authentication to use fluent model.
-pub trait WithAuthentication<Request, Response, Error, ConfigError>
-where
-    Self: Sized,
-{
-    fn with_authentication(
-        self,
-        protocol: &dyn AuthenticationProtocol<
-            Builder = Self,
-            Request = Request,
-            Response = Response,
-            Error = Error,
-            ConfigError = ConfigError,
-        >,
-    ) -> Result<Self, ConfigError> {
-        protocol.configure(self)
+pub trait AuthenticationProtocolConfigure<Builder> {
+    type Error;
+
+    fn configure(&self, builder: Builder) -> Result<Builder, Self::Error> {
+        Ok(builder)
     }
 }
 
-#[cfg(feature = "hyper")]
-impl
-    WithAuthentication<
-        ::hyper::Request<::hyper::Body>,
-        ::hyper::Response<::hyper::Body>,
-        ::hyper::Error,
-        ::hyper::header::InvalidHeaderValue,
-    > for http::request::Builder
+// Allow request builder authentication to use fluent model.
+pub trait WithAuthentication
+where
+    Self: Sized,
 {
+    fn with_authentication<Configure>(
+        self,
+        protocol: &Configure,
+    ) -> Result<Self, <Configure as AuthenticationProtocolConfigure<Self>>::Error>
+    where
+        Configure: AuthenticationProtocolConfigure<Self>,
+    {
+        protocol.configure(self)
+    }
 }
+#[cfg(feature = "hyper")]
+impl WithAuthentication for http::request::Builder {}
 
 #[cfg(feature = "reqwest")]
-impl
-    WithAuthentication<
-        ::reqwest::Request,
-        ::reqwest::Response,
-        ::reqwest::Error,
-        reqwest::ReqwestConfigError,
-    > for ::reqwest::Request
-{
-}
+impl WithAuthentication for ::reqwest::RequestBuilder {}
+#[cfg(feature = "reqwest")]
+impl WithAuthentication for ::reqwest::Request {}
 
 #[cfg(feature = "reqwest_blocking")]
-impl
-    WithAuthentication<
-        ::reqwest::blocking::Request,
-        ::reqwest::blocking::Response,
-        ::reqwest::Error,
-        reqwest::ReqwestConfigError,
-    > for ::reqwest::blocking::Request
-{
-}
+impl WithAuthentication for ::reqwest::blocking::RequestBuilder {}
+#[cfg(feature = "reqwest_blocking")]
+impl WithAuthentication for ::reqwest::blocking::Request {}

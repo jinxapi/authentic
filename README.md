@@ -20,13 +20,13 @@ realm_credentials.insert(
 let credential = HttpRealmCredentials::new(realm_credentials);
 
 // Per-request code:
-let mut scheme = HttpAuthentication::new(&credential);
+let mut authentication = HttpAuthentication::new(&credential);
 let response = loop {
-    while let Some(auth_step) = scheme.step() {
+    while let Some(auth_step) = authentication.step() {
         match auth_step {
             AuthenticationStep::Request(request) => {
                 let auth_response = client.execute(request);
-                scheme.respond(auth_response);
+                authentication.respond(auth_response);
             }
             AuthenticationStep::WaitFor(duration) => {
                 std::thread::sleep(duration);
@@ -34,14 +34,12 @@ let response = loop {
         }
     }
 
-    let request = client
+    let response = client
         .get("https://httpbin.org/basic-auth/username/password")
-        .build()?
-        .with_authentication(&scheme)?;
+        .with_authentication(&authentication)?
+        .send()?;
 
-    let response = client.execute(request)?;
-
-    if scheme.has_completed(&response)? {
+    if authentication.has_completed(&response)? {
         break response;
     }
 };
