@@ -142,7 +142,6 @@ pub trait WithAuthentication<Request, Response, Error, ConfigError>
 where
     Self: Sized,
 {
-    #[must_use]
     fn with_authentication(
         self,
         protocol: &dyn AuthenticationProtocol<
