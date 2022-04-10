@@ -111,7 +111,9 @@ where
         value.extend(token);
         let mut header_value = ::reqwest::header::HeaderValue::try_from(value)?;
         header_value.set_sensitive(true);
-        builder.headers_mut().append(reqwest::header::AUTHORIZATION, header_value);
+        builder
+            .headers_mut()
+            .append(reqwest::header::AUTHORIZATION, header_value);
         Ok(builder)
     }
 }
@@ -149,7 +151,9 @@ where
         );
         let mut header_value = ::reqwest::header::HeaderValue::try_from(value)?;
         header_value.set_sensitive(true);
-        builder.headers_mut().append(reqwest::header::AUTHORIZATION, header_value);
+        builder
+            .headers_mut()
+            .append(reqwest::header::AUTHORIZATION, header_value);
         Ok(builder)
     }
 }
