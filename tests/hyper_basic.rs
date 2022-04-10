@@ -17,16 +17,16 @@ async fn test_basic_authentication(
     let client = Client::builder().build::<_, ::hyper::Body>(https);
 
     let credential = UsernamePasswordCredential::new("username", "password");
-    let mut scheme = BasicAuthentication::new(&credential);
+    let mut authentication = BasicAuthentication::new(&credential);
 
     let mut status_codes = Vec::new();
 
     let _response = loop {
-        while let Some(auth_step) = scheme.step() {
+        while let Some(auth_step) = authentication.step() {
             match auth_step {
                 AuthenticationStep::Request(request) => {
                     let auth_response = client.request(request).await;
-                    scheme.respond(auth_response);
+                    authentication.respond(auth_response);
                 }
                 AuthenticationStep::WaitFor(duration) => {
                     ::tokio::time::sleep(duration).await;
@@ -34,7 +34,7 @@ async fn test_basic_authentication(
             }
         }
         let request = ::hyper::Request::get("https://httpbin.org/basic-auth/username/password")
-            .with_authentication(&scheme)?
+            .with_authentication(&authentication)?
             .body(::hyper::Body::empty())?;
 
         dbg!(&request);
@@ -45,7 +45,7 @@ async fn test_basic_authentication(
 
         status_codes.push(response.status());
 
-        if scheme.has_completed(&response)? {
+        if authentication.has_completed(&response)? {
             break response;
         }
     };
@@ -67,16 +67,16 @@ async fn test_basic_challenge() -> Result<(), Box<dyn std::error::Error + Send +
         UsernamePasswordCredential::new("username", "password"),
     );
     let credential = HttpRealmCredentials::new(realm_credentials);
-    let mut scheme = HttpAuthentication::new(&credential);
+    let mut authentication = HttpAuthentication::new(&credential);
 
     let mut status_codes = Vec::new();
 
     let _response = loop {
-        while let Some(auth_step) = scheme.step() {
+        while let Some(auth_step) = authentication.step() {
             match auth_step {
                 AuthenticationStep::Request(request) => {
                     let auth_response = client.request(request).await;
-                    scheme.respond(auth_response);
+                    authentication.respond(auth_response);
                 }
                 AuthenticationStep::WaitFor(duration) => {
                     ::tokio::time::sleep(duration).await;
@@ -84,7 +84,7 @@ async fn test_basic_challenge() -> Result<(), Box<dyn std::error::Error + Send +
             }
         }
         let request = ::hyper::Request::get("https://httpbin.org/basic-auth/username/password")
-            .with_authentication(&scheme)?
+            .with_authentication(&authentication)?
             .body(::hyper::Body::empty())?;
 
         dbg!(&request);
@@ -95,7 +95,7 @@ async fn test_basic_challenge() -> Result<(), Box<dyn std::error::Error + Send +
 
         status_codes.push(response.status());
 
-        if scheme.has_completed(&response)? {
+        if authentication.has_completed(&response)? {
             break response;
         }
     };
