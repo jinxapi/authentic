@@ -1,7 +1,7 @@
 [package]
 edition = "2021"
 name = "authentic"
-version = "0.2.0"
+version = "0.3.0"
 authors = ["Jonathan Giddy"]
 description = "Authentication library"
 homepage = "https://github.com/jinxapi/authentic/blob/main/README.md"
