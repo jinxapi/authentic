@@ -220,13 +220,7 @@ where
         &self,
         builder: reqwest::blocking::RequestBuilder,
     ) -> Result<reqwest::blocking::RequestBuilder, crate::reqwest::ReqwestConfigError> {
-        let value = ::http_auth::basic::encode_credentials(
-            self.credential.username(),
-            self.credential.password(),
-        );
-        let mut header_value = ::reqwest::header::HeaderValue::try_from(value)?;
-        header_value.set_sensitive(true);
-        Ok(builder.header(reqwest::header::AUTHORIZATION, header_value))
+        Ok(builder.basic_auth(self.credential.username(), Some(self.credential.password())))
     }
 }
 
