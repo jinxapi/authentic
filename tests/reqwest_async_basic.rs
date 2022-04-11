@@ -2,7 +2,6 @@
 
 use std::collections::HashMap;
 
-use ::reqwest::Client;
 use authentic::credential::{HttpRealmCredentials, UsernamePasswordCredential};
 use authentic::reqwest::{BasicAuthentication, HttpAuthentication};
 use authentic::{AuthenticationProtocol, AuthenticationStep, WithAuthentication};
@@ -12,7 +11,7 @@ use http::StatusCode;
 /// In this test, the authentication is added to the RequestBuilder.
 #[::tokio::test]
 async fn test_basic_builder() -> Result<(), Box<dyn std::error::Error + Send + Sync + 'static>> {
-    let client = Client::new();
+    let client = reqwest::Client::new();
 
     let credential = UsernamePasswordCredential::new("username", "password");
     let mut authentication = BasicAuthentication::new(&credential);
@@ -52,10 +51,11 @@ async fn test_basic_builder() -> Result<(), Box<dyn std::error::Error + Send + S
 }
 
 /// Direct basic authentication, passing the username and password on the first request.
-/// In this test, the authentication is added to the Request.
+/// In this test, the authentication is added to the Request.  This allows the request to
+/// be created separately to the client.
 #[::tokio::test]
 async fn test_basic_request() -> Result<(), Box<dyn std::error::Error + Send + Sync + 'static>> {
-    let client = Client::new();
+    let client = reqwest::Client::new();
 
     let credential = UsernamePasswordCredential::new("username", "password");
     let mut authentication = BasicAuthentication::new(&credential);
@@ -74,10 +74,11 @@ async fn test_basic_request() -> Result<(), Box<dyn std::error::Error + Send + S
                 }
             }
         }
-        let request = client
-            .get("https://httpbin.org/basic-auth/username/password")
-            .build()?
-            .with_authentication(&authentication)?;
+        let request = reqwest::Request::new(
+            reqwest::Method::GET,
+            reqwest::Url::parse("https://httpbin.org/basic-auth/username/password")?,
+        )
+        .with_authentication(&authentication)?;
 
         dbg!(&request);
 
@@ -100,7 +101,7 @@ async fn test_basic_request() -> Result<(), Box<dyn std::error::Error + Send + S
 /// Basic authentication passing the username and password in response to a 401 challenge.
 #[::tokio::test]
 async fn test_basic_challenge() -> Result<(), Box<dyn std::error::Error + Send + Sync + 'static>> {
-    let client = Client::new();
+    let client = reqwest::Client::new();
 
     let mut realm_credentials = HashMap::new();
     realm_credentials.insert(

@@ -2,7 +2,6 @@
 
 use std::collections::HashMap;
 
-use ::reqwest::blocking::Client;
 use authentic::credential::{HttpRealmCredentials, UsernamePasswordCredential};
 use authentic::reqwest::blocking::{BasicAuthentication, HttpAuthentication};
 use authentic::{AuthenticationProtocol, AuthenticationStep, WithAuthentication};
@@ -12,7 +11,7 @@ use http::StatusCode;
 /// In this test, the authentication is added to the RequestBuilder.
 #[test]
 fn test_basic_builder() -> Result<(), Box<dyn std::error::Error>> {
-    let client = Client::new();
+    let client = reqwest::blocking::Client::new();
 
     let credential = UsernamePasswordCredential::new("username", "password");
     let mut authentication = BasicAuthentication::new(&credential);
@@ -51,10 +50,11 @@ fn test_basic_builder() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 /// Direct basic authentication, passing the username and password on the first request.
-/// In this test, the authentication is added to the Request.
+/// In this test, the authentication is added to the Request.  This allows the request to
+/// be created separately to the client.
 #[test]
 fn test_basic_request() -> Result<(), Box<dyn std::error::Error>> {
-    let client = Client::new();
+    let client = reqwest::blocking::Client::new();
 
     let credential = UsernamePasswordCredential::new("username", "password");
     let mut authentication = BasicAuthentication::new(&credential);
@@ -73,10 +73,11 @@ fn test_basic_request() -> Result<(), Box<dyn std::error::Error>> {
                 }
             }
         }
-        let request = client
-            .get("https://httpbin.org/basic-auth/username/password")
-            .build()?
-            .with_authentication(&authentication)?;
+        let request = reqwest::blocking::Request::new(
+            reqwest::Method::GET,
+            reqwest::Url::parse("https://httpbin.org/basic-auth/username/password")?,
+        )
+        .with_authentication(&authentication)?;
 
         dbg!(&request);
 
@@ -99,7 +100,7 @@ fn test_basic_request() -> Result<(), Box<dyn std::error::Error>> {
 /// Basic authentication passing the username and password in response to a 401 challenge.
 #[test]
 fn test_basic_challenge() -> Result<(), Box<dyn std::error::Error>> {
-    let client = Client::new();
+    let client = reqwest::blocking::Client::new();
 
     let mut realm_credentials = HashMap::new();
     realm_credentials.insert(
