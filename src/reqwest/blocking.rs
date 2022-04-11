@@ -293,7 +293,7 @@ where
                     let pw_client = ::http_auth::PasswordClient::try_from(
                         response
                             .headers()
-                            .get_all(::hyper::header::WWW_AUTHENTICATE),
+                            .get_all(::reqwest::header::WWW_AUTHENTICATE),
                     )
                     .map_err(AuthenticError::Other)?;
                     match pw_client {
