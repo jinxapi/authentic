@@ -48,7 +48,7 @@ let response = loop {
 The creation of the request takes place inside a loop. First, the authentication protocol is given an opportunity to perform any third-party calls using `step()`.
 HTTP Basic authentication does not use this, but it can be used, for example, to refresh an expired OAuth2 access token.
 
-The request is created using a standard `reqwest::RequestBuilde`, using a new `with_authentication()` method to modify the request for the authentication protocol.
+The request is created using a standard `reqwest::RequestBuilder`, using a new `with_authentication()` method to modify the request for the authentication protocol.
 For HTTP authentication, the first iteration makes no change to the request.
 
 The request is sent and a response is received.  For HTTP authentication, this returns a `401 Unauthorized` response.
