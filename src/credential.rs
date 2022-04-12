@@ -1,16 +1,21 @@
 use std::borrow::Cow;
 use std::collections::HashMap;
 use std::sync::Arc;
+use std::time::Duration;
 
-use crate::{AuthenticError, AuthenticationProcess};
+use crate::AuthenticError;
 
-pub trait AuthenticationCredential: AuthenticationProcess {}
+pub trait AuthenticationCredential {
+    fn auth_step(&mut self) -> Duration {
+        Duration::ZERO
+    }
+}
 
-pub trait AuthenticationCredentialToken {
+pub trait AuthenticationCredentialToken: AuthenticationCredential {
     fn token(&self) -> Result<Arc<Vec<u8>>, AuthenticError>;
 }
 
-pub trait AuthenticationCredentialUsernamePassword {
+pub trait AuthenticationCredentialUsernamePassword: AuthenticationCredential {
     fn username(&self) -> &str;
     fn password(&self) -> &str;
 }
@@ -27,7 +32,6 @@ impl TokenCredential {
     }
 }
 
-impl AuthenticationProcess for TokenCredential {}
 impl AuthenticationCredential for TokenCredential {}
 
 impl AuthenticationCredentialToken for TokenCredential {
@@ -53,7 +57,6 @@ impl UsernamePasswordCredential {
     }
 }
 
-impl AuthenticationProcess for UsernamePasswordCredential {}
 impl AuthenticationCredential for UsernamePasswordCredential {}
 
 impl AuthenticationCredentialUsernamePassword for UsernamePasswordCredential {
@@ -85,5 +88,4 @@ impl<Credential> HttpRealmCredentials<Credential> {
     }
 }
 
-impl<Credential> AuthenticationProcess for HttpRealmCredentials<Credential> {}
 impl<Credential> AuthenticationCredential for HttpRealmCredentials<Credential> {}

@@ -31,8 +31,7 @@ impl AuthenticationProtocol for NoAuthentication {
     type Error = hyper::Error;
 }
 
-impl AuthenticationProtocolConfigure<http::request::Builder> for NoAuthentication {
-}
+impl AuthenticationProtocolConfigure<http::request::Builder> for NoAuthentication {}
 
 /// Authentication using a token in a specified header.
 pub struct HeaderAuthentication<Credential> {
@@ -200,9 +199,9 @@ where
     type Response = hyper::Response<hyper::Body>;
     type Error = hyper::Error;
 
-    fn step(&mut self) -> Option<AuthenticationStep<Self::Request>> {
+    fn step(&mut self) -> Result<Option<AuthenticationStep<Self::Request>>, AuthenticError> {
         match self {
-            Self::Initial(_) => None,
+            Self::Initial(_) => Ok(None),
             Self::Basic(basic) => basic.step(),
         }
     }

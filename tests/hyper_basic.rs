@@ -22,7 +22,7 @@ async fn test_basic_authentication(
     let mut status_codes = Vec::new();
 
     let _response = loop {
-        while let Some(auth_step) = authentication.step() {
+        while let Some(auth_step) = authentication.step()? {
             match auth_step {
                 AuthenticationStep::Request(request) => {
                     let auth_response = client.request(request).await;
@@ -72,7 +72,7 @@ async fn test_basic_challenge() -> Result<(), Box<dyn std::error::Error + Send +
     let mut status_codes = Vec::new();
 
     let _response = loop {
-        while let Some(auth_step) = authentication.step() {
+        while let Some(auth_step) = authentication.step()? {
             match auth_step {
                 AuthenticationStep::Request(request) => {
                     let auth_response = client.request(request).await;
