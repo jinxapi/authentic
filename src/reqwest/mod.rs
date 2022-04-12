@@ -252,9 +252,9 @@ where
     type Response = reqwest::Response;
     type Error = reqwest::Error;
 
-    fn step(&mut self) -> Option<AuthenticationStep<Self::Request>> {
+    fn step(&mut self) -> Result<Option<AuthenticationStep<Self::Request>>, AuthenticError> {
         match self {
-            Self::Initial(_) => None,
+            Self::Initial(_) => Ok(None),
             Self::Basic(basic) => basic.step(),
         }
     }

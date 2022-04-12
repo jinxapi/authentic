@@ -22,7 +22,7 @@
 //! // Per-request code:
 //! let mut authentication = HttpAuthentication::new(&credential);
 //! let response = loop {
-//!     while let Some(auth_step) = authentication.step() {
+//!     while let Some(auth_step) = authentication.step()? {
 //!         match auth_step {
 //!             AuthenticationStep::Request(request) => {
 //!                 let auth_response = client.execute(request);
@@ -99,26 +99,13 @@ pub enum AuthenticationStep<Request> {
     WaitFor(Duration),
 }
 
-pub trait AuthenticationProcess {
-    fn auth_step<Request>(&mut self) -> Option<AuthenticationStep<Request>> {
-        None
-    }
-
-    fn auth_response<Response, Error>(
-        &mut self,
-        #[allow(unused_variables)] response: Result<Response, Error>,
-    ) {
-        panic!("Unexpected auth response");
-    }
-}
-
 pub trait AuthenticationProtocol {
     type Request;
     type Response;
     type Error;
 
-    fn step(&mut self) -> Option<AuthenticationStep<Self::Request>> {
-        None
+    fn step(&mut self) -> Result<Option<AuthenticationStep<Self::Request>>, AuthenticError> {
+        Ok(None)
     }
 
     fn respond(
