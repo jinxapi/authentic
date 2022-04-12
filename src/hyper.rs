@@ -32,7 +32,6 @@ impl AuthenticationProtocol for NoAuthentication {
 }
 
 impl AuthenticationProtocolConfigure<http::request::Builder> for NoAuthentication {
-    type Error = hyper::header::InvalidHeaderValue;
 }
 
 /// Authentication using a token in a specified header.
@@ -67,13 +66,11 @@ impl<Credential> AuthenticationProtocolConfigure<http::request::Builder>
 where
     Credential: AuthenticationCredentialToken,
 {
-    type Error = hyper::header::InvalidHeaderValue;
-
     fn configure(
         &self,
         builder: http::request::Builder,
-    ) -> Result<http::request::Builder, hyper::header::InvalidHeaderValue> {
-        let mut header_value = HeaderValue::try_from(self.credential.token())?;
+    ) -> Result<http::request::Builder, AuthenticError> {
+        let mut header_value = HeaderValue::try_from(self.credential.token()?.as_slice())?;
         header_value.set_sensitive(true);
         Ok(builder.header(self.header_name.as_ref(), header_value))
     }
@@ -120,17 +117,15 @@ impl<Credential> AuthenticationProtocolConfigure<http::request::Builder>
 where
     Credential: AuthenticationCredentialToken,
 {
-    type Error = hyper::header::InvalidHeaderValue;
-
     fn configure(
         &self,
         builder: http::request::Builder,
-    ) -> Result<http::request::Builder, hyper::header::InvalidHeaderValue> {
-        let token = self.credential.token();
+    ) -> Result<http::request::Builder, AuthenticError> {
+        let token = self.credential.token()?;
         let mut value = Vec::with_capacity(self.auth_scheme.len() + 1 + token.len());
         value.extend(self.auth_scheme.as_bytes());
         value.push(b' ');
-        value.extend(token);
+        value.extend(token.as_slice());
         let mut header_value = HeaderValue::try_from(value)?;
         header_value.set_sensitive(true);
         Ok(builder.header(hyper::header::AUTHORIZATION, header_value))
@@ -167,12 +162,10 @@ impl<Credential> AuthenticationProtocolConfigure<http::request::Builder>
 where
     Credential: AuthenticationCredentialUsernamePassword,
 {
-    type Error = hyper::header::InvalidHeaderValue;
-
     fn configure(
         &self,
         builder: http::request::Builder,
-    ) -> Result<http::request::Builder, hyper::header::InvalidHeaderValue> {
+    ) -> Result<http::request::Builder, AuthenticError> {
         let value = ::http_auth::basic::encode_credentials(
             self.credential.username(),
             self.credential.password(),
@@ -259,12 +252,10 @@ impl<Credential> AuthenticationProtocolConfigure<http::request::Builder>
 where
     Credential: AuthenticationCredentialUsernamePassword,
 {
-    type Error = hyper::header::InvalidHeaderValue;
-
     fn configure(
         &self,
         builder: http::request::Builder,
-    ) -> Result<http::request::Builder, hyper::header::InvalidHeaderValue> {
+    ) -> Result<http::request::Builder, AuthenticError> {
         match self {
             Self::Initial(_) => Ok(builder),
             Self::Basic(basic) => basic.configure(builder),
