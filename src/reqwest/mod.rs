@@ -4,23 +4,12 @@
 use std::borrow::Cow;
 use std::sync::Arc;
 
-use thiserror::Error;
-
 use crate::credential::{
     AuthenticationCredentialToken, AuthenticationCredentialUsernamePassword, HttpRealmCredentials,
 };
 use crate::{
     AuthenticError, AuthenticationProtocol, AuthenticationProtocolConfigure, AuthenticationStep,
 };
-
-#[derive(Error, Debug)]
-pub enum ReqwestConfigError {
-    #[error("Invalid Header Name")]
-    InvalidHeaderName(#[from] ::reqwest::header::InvalidHeaderName),
-
-    #[error("Invalid Header Value")]
-    InvalidHeaderValue(#[from] ::reqwest::header::InvalidHeaderValue),
-}
 
 #[cfg(feature = "reqwest_blocking")]
 pub mod blocking;
@@ -43,13 +32,9 @@ impl AuthenticationProtocol for NoAuthentication {
     type Error = reqwest::Error;
 }
 
-impl AuthenticationProtocolConfigure<reqwest::RequestBuilder> for NoAuthentication {
-    type Error = ReqwestConfigError;
-}
+impl AuthenticationProtocolConfigure<reqwest::RequestBuilder> for NoAuthentication {}
 
-impl AuthenticationProtocolConfigure<reqwest::Request> for NoAuthentication {
-    type Error = ReqwestConfigError;
-}
+impl AuthenticationProtocolConfigure<reqwest::Request> for NoAuthentication {}
 
 /// Authentication using a token in a specified header.
 pub struct HeaderAuthentication<Credential> {
@@ -83,14 +68,13 @@ impl<Credential> AuthenticationProtocolConfigure<reqwest::RequestBuilder>
 where
     Credential: AuthenticationCredentialToken,
 {
-    type Error = ReqwestConfigError;
-
     fn configure(
         &self,
         builder: reqwest::RequestBuilder,
-    ) -> Result<reqwest::RequestBuilder, ReqwestConfigError> {
+    ) -> Result<reqwest::RequestBuilder, AuthenticError> {
         let header_name = ::reqwest::header::HeaderName::try_from(self.header_name.as_ref())?;
-        let mut header_value = ::reqwest::header::HeaderValue::try_from(self.credential.token())?;
+        let mut header_value =
+            ::reqwest::header::HeaderValue::try_from(self.credential.token()?.as_slice())?;
         header_value.set_sensitive(true);
         Ok(builder.header(header_name, header_value))
     }
@@ -101,14 +85,10 @@ impl<Credential> AuthenticationProtocolConfigure<reqwest::Request>
 where
     Credential: AuthenticationCredentialToken,
 {
-    type Error = ReqwestConfigError;
-
-    fn configure(
-        &self,
-        mut builder: reqwest::Request,
-    ) -> Result<reqwest::Request, ReqwestConfigError> {
+    fn configure(&self, mut builder: reqwest::Request) -> Result<reqwest::Request, AuthenticError> {
         let header_name = ::reqwest::header::HeaderName::try_from(self.header_name.as_ref())?;
-        let mut header_value = ::reqwest::header::HeaderValue::try_from(self.credential.token())?;
+        let mut header_value =
+            ::reqwest::header::HeaderValue::try_from(self.credential.token()?.as_slice())?;
         header_value.set_sensitive(true);
         builder.headers_mut().append(header_name, header_value);
         Ok(builder)
@@ -156,17 +136,15 @@ impl<Credential> AuthenticationProtocolConfigure<reqwest::RequestBuilder>
 where
     Credential: AuthenticationCredentialToken,
 {
-    type Error = ReqwestConfigError;
-
     fn configure(
         &self,
         builder: reqwest::RequestBuilder,
-    ) -> Result<reqwest::RequestBuilder, ReqwestConfigError> {
-        let token = self.credential.token();
+    ) -> Result<reqwest::RequestBuilder, AuthenticError> {
+        let token = self.credential.token()?;
         let mut value = Vec::with_capacity(self.auth_scheme.len() + 1 + token.len());
         value.extend(self.auth_scheme.as_bytes());
         value.push(b' ');
-        value.extend(token);
+        value.extend(token.as_slice());
         let mut header_value = ::reqwest::header::HeaderValue::try_from(value)?;
         header_value.set_sensitive(true);
         Ok(builder.header(reqwest::header::AUTHORIZATION, header_value))
@@ -178,17 +156,12 @@ impl<Credential> AuthenticationProtocolConfigure<reqwest::Request>
 where
     Credential: AuthenticationCredentialToken,
 {
-    type Error = ReqwestConfigError;
-
-    fn configure(
-        &self,
-        mut builder: reqwest::Request,
-    ) -> Result<reqwest::Request, ReqwestConfigError> {
-        let token = self.credential.token();
+    fn configure(&self, mut builder: reqwest::Request) -> Result<reqwest::Request, AuthenticError> {
+        let token = self.credential.token()?;
         let mut value = Vec::with_capacity(self.auth_scheme.len() + 1 + token.len());
         value.extend(self.auth_scheme.as_bytes());
         value.push(b' ');
-        value.extend(token);
+        value.extend(token.as_slice());
         let mut header_value = ::reqwest::header::HeaderValue::try_from(value)?;
         header_value.set_sensitive(true);
         builder
@@ -228,12 +201,10 @@ impl<Credential> AuthenticationProtocolConfigure<reqwest::RequestBuilder>
 where
     Credential: AuthenticationCredentialUsernamePassword,
 {
-    type Error = ReqwestConfigError;
-
     fn configure(
         &self,
         builder: reqwest::RequestBuilder,
-    ) -> Result<reqwest::RequestBuilder, ReqwestConfigError> {
+    ) -> Result<reqwest::RequestBuilder, AuthenticError> {
         Ok(builder.basic_auth(self.credential.username(), Some(self.credential.password())))
     }
 }
@@ -243,12 +214,7 @@ impl<Credential> AuthenticationProtocolConfigure<reqwest::Request>
 where
     Credential: AuthenticationCredentialUsernamePassword,
 {
-    type Error = ReqwestConfigError;
-
-    fn configure(
-        &self,
-        mut builder: reqwest::Request,
-    ) -> Result<reqwest::Request, ReqwestConfigError> {
+    fn configure(&self, mut builder: reqwest::Request) -> Result<reqwest::Request, AuthenticError> {
         let value = ::http_auth::basic::encode_credentials(
             self.credential.username(),
             self.credential.password(),
@@ -338,12 +304,10 @@ impl<Credential> AuthenticationProtocolConfigure<reqwest::RequestBuilder>
 where
     Credential: AuthenticationCredentialUsernamePassword + 'static,
 {
-    type Error = ReqwestConfigError;
-
     fn configure(
         &self,
         builder: reqwest::RequestBuilder,
-    ) -> Result<reqwest::RequestBuilder, ReqwestConfigError> {
+    ) -> Result<reqwest::RequestBuilder, AuthenticError> {
         match self {
             Self::Initial(_) => Ok(builder),
             Self::Basic(basic) => basic.configure(builder),
@@ -356,9 +320,7 @@ impl<Credential> AuthenticationProtocolConfigure<reqwest::Request>
 where
     Credential: AuthenticationCredentialUsernamePassword + 'static,
 {
-    type Error = ReqwestConfigError;
-
-    fn configure(&self, builder: reqwest::Request) -> Result<reqwest::Request, ReqwestConfigError> {
+    fn configure(&self, builder: reqwest::Request) -> Result<reqwest::Request, AuthenticError> {
         match self {
             Self::Initial(_) => Ok(builder),
             Self::Basic(basic) => basic.configure(builder),

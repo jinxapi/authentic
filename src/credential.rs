@@ -2,12 +2,12 @@ use std::borrow::Cow;
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use crate::AuthenticationProcess;
+use crate::{AuthenticError, AuthenticationProcess};
 
 pub trait AuthenticationCredential: AuthenticationProcess {}
 
 pub trait AuthenticationCredentialToken {
-    fn token(&self) -> &[u8];
+    fn token(&self) -> Result<Arc<Vec<u8>>, AuthenticError>;
 }
 
 pub trait AuthenticationCredentialUsernamePassword {
@@ -16,13 +16,13 @@ pub trait AuthenticationCredentialUsernamePassword {
 }
 
 pub struct TokenCredential {
-    current_token: Cow<'static, [u8]>,
+    current_token: Arc<Vec<u8>>,
 }
 
 impl TokenCredential {
     pub fn new(token: impl Into<Cow<'static, [u8]>>) -> Arc<Self> {
         Arc::new(Self {
-            current_token: token.into(),
+            current_token: Arc::new(token.into().into_owned()),
         })
     }
 }
@@ -31,8 +31,8 @@ impl AuthenticationProcess for TokenCredential {}
 impl AuthenticationCredential for TokenCredential {}
 
 impl AuthenticationCredentialToken for TokenCredential {
-    fn token(&self) -> &[u8] {
-        self.current_token.as_ref()
+    fn token(&self) -> Result<Arc<Vec<u8>>, AuthenticError> {
+        Ok(self.current_token.clone())
     }
 }
 

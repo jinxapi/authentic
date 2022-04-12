@@ -76,6 +76,13 @@ pub enum AuthenticError {
     #[error("Hyper error")]
     Hyper(#[from] ::hyper::Error),
 
+    #[error("Invalid header value")]
+    InvalidHeaderValue(#[from] ::http::header::InvalidHeaderValue),
+
+    #[cfg(feature = "reqwest")]
+    #[error("Invalid Header Name")]
+    ReqwestInvalidHeaderName(#[from] ::reqwest::header::InvalidHeaderName),
+
     #[cfg(feature = "reqwest")]
     #[error("Reqwest error")]
     Reqwest(#[from] ::reqwest::Error),
@@ -130,9 +137,7 @@ pub trait AuthenticationProtocol {
 }
 
 pub trait AuthenticationProtocolConfigure<Builder> {
-    type Error;
-
-    fn configure(&self, builder: Builder) -> Result<Builder, Self::Error> {
+    fn configure(&self, builder: Builder) -> Result<Builder, AuthenticError> {
         Ok(builder)
     }
 }
@@ -142,10 +147,7 @@ pub trait WithAuthentication
 where
     Self: Sized,
 {
-    fn with_authentication<Configure>(
-        self,
-        protocol: &Configure,
-    ) -> Result<Self, <Configure as AuthenticationProtocolConfigure<Self>>::Error>
+    fn with_authentication<Configure>(self, protocol: &Configure) -> Result<Self, AuthenticError>
     where
         Configure: AuthenticationProtocolConfigure<Self>,
     {
