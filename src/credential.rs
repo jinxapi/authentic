@@ -66,7 +66,9 @@ pub struct FetchedJsonWebTokenCredential {
 #[cfg(feature = "jwt")]
 pub struct JsonWebTokenCredential {
     current: arc_swap::ArcSwapOption<FetchedJsonWebTokenCredential>,
-    renewing: std::sync::Mutex<()>,
+    // Mutex to be held while renewing. Contains a copy of the renew time
+    // to prevent race conditions.
+    renewing: std::sync::Mutex<std::time::SystemTime>,
     header: jsonwebtoken::Header,
     key: jsonwebtoken::EncodingKey,
     expiration: Duration,
@@ -82,7 +84,7 @@ impl JsonWebTokenCredential {
     ) -> Self {
         Self {
             current: arc_swap::ArcSwapOption::from(None),
-            renewing: std::sync::Mutex::new(()),
+            renewing: std::sync::Mutex::new(std::time::SystemTime::UNIX_EPOCH),
             header,
             key,
             expiration,
@@ -123,12 +125,17 @@ impl AuthenticationCredential for JsonWebTokenCredential {
                 false
             }
         };
-        // TODO: Harmless but wasteful race condition where a caller may see the old token before
-        // here while an earlier caller is renewing, and then manages to lock the mutex below just
-        // after renewal. The later caller will then needlessly renew the token again.
         match self.renewing.try_lock() {
-            Ok(_guard) => {
-                // First caller after renewal time gets to refresh the token.
+            // First caller after renewal time locks the mutex and refreshes the token.
+            // Other callers fail to lock and continue with the current token if it is still valid,
+            // or wait a short time and retry until the lock holder has renewed the token.
+            Ok(mut renew_time) => {
+                if now < *renew_time {
+                    // Caller saw an old token while a previous thread was renewing the token, and
+                    // acquired the mutex after the previous thread released it. Prevent the caller
+                    // from needlessly renewing the token by checking the renew time again.
+                    return Ok(Duration::ZERO);
+                }
                 let exp = now + self.expiration;
                 let claims = JWTClaims {
                     iat: now
@@ -147,11 +154,10 @@ impl AuthenticationCredential for JsonWebTokenCredential {
                     expiry: exp,
                 };
                 self.current.store(Some(Arc::new(fetched)));
+                *renew_time = renew;
                 Ok(Duration::ZERO)
             }
             Err(std::sync::TryLockError::WouldBlock) => {
-                // Other callers continue with the current token if it is still valid,
-                // or wait until the lock holder has renewed the token.
                 if current_is_valid {
                     // Current token is still valid.
                     Ok(Duration::ZERO)
