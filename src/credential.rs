@@ -113,8 +113,8 @@ impl AuthenticationCredential for JsonWebTokenCredential {
         let current_is_valid = {
             let guard = self.current.load();
             if let Some(current) = &*guard {
-                dbg!(now, current.renew, current.expiry);
                 if now < current.renew {
+                    // Current token is valid and too early to renew.
                     return Ok(Duration::ZERO);
                 } else {
                     now < current.expiry
@@ -123,10 +123,12 @@ impl AuthenticationCredential for JsonWebTokenCredential {
                 false
             }
         };
+        // TODO: Harmless but wasteful race condition where a caller may see the old token before
+        // here while an earlier caller is renewing, and then manages to lock the mutex below just
+        // after renewal. The later caller will then needlessly renew the token again.
         match self.renewing.try_lock() {
             Ok(_guard) => {
-                // create new token
-                println!("Renewing JWT");
+                // First caller after renewal time gets to refresh the token.
                 let exp = now + self.expiration;
                 let claims = JWTClaims {
                     iat: now
@@ -148,11 +150,13 @@ impl AuthenticationCredential for JsonWebTokenCredential {
                 Ok(Duration::ZERO)
             }
             Err(std::sync::TryLockError::WouldBlock) => {
+                // Other callers continue with the current token if it is still valid,
+                // or wait until the lock holder has renewed the token.
                 if current_is_valid {
-                    // existing credential still valid
+                    // Current token is still valid.
                     Ok(Duration::ZERO)
                 } else {
-                    // wait for lock holder to refresh token
+                    // Current token has expired. Wait for lock holder to refresh token
                     Ok(Duration::from_millis(10))
                 }
             }
