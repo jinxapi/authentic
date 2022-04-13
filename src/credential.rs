@@ -6,65 +6,93 @@ use std::time::Duration;
 use crate::AuthenticError;
 
 pub trait AuthenticationCredential {
-    fn auth_step(&mut self) -> Duration {
-        Duration::ZERO
+    type Fetch;
+
+    fn auth_step(&self) -> Result<Duration, AuthenticError> {
+        Ok(Duration::ZERO)
     }
+
+    fn fetch(&self) -> Result<Self::Fetch, AuthenticError>;
 }
 
-pub trait AuthenticationCredentialToken: AuthenticationCredential {
-    fn token(&self) -> Result<Arc<Vec<u8>>, AuthenticError>;
+pub trait FetchedToken {
+    fn token(&self) -> &[u8];
 }
 
-pub trait AuthenticationCredentialUsernamePassword: AuthenticationCredential {
+pub trait FetchedUsernamePassword {
     fn username(&self) -> &str;
     fn password(&self) -> &str;
 }
 
+pub struct FetchedTokenCredential {
+    token: Cow<'static, [u8]>,
+}
+
 pub struct TokenCredential {
-    current_token: Arc<Vec<u8>>,
+    current: Arc<FetchedTokenCredential>,
 }
 
 impl TokenCredential {
-    pub fn new(token: impl Into<Cow<'static, [u8]>>) -> Arc<Self> {
-        Arc::new(Self {
-            current_token: Arc::new(token.into().into_owned()),
-        })
+    pub fn new(token: impl Into<Cow<'static, [u8]>>) -> Self {
+        Self {
+            current: Arc::new(FetchedTokenCredential {
+                token: token.into(),
+            }),
+        }
     }
 }
 
-impl AuthenticationCredential for TokenCredential {}
+impl AuthenticationCredential for TokenCredential {
+    type Fetch = Arc<FetchedTokenCredential>;
 
-impl AuthenticationCredentialToken for TokenCredential {
-    fn token(&self) -> Result<Arc<Vec<u8>>, AuthenticError> {
-        Ok(self.current_token.clone())
+    fn fetch(&self) -> Result<Self::Fetch, AuthenticError> {
+        Ok(self.current.clone())
     }
+}
+
+impl FetchedToken for Arc<FetchedTokenCredential> {
+    fn token(&self) -> &[u8] {
+        self.token.as_ref()
+    }
+}
+
+pub struct FetchedUsernamePasswordCredential {
+    username: Cow<'static, str>,
+    password: Cow<'static, str>,
 }
 
 pub struct UsernamePasswordCredential {
-    current_username: Cow<'static, str>,
-    current_password: Cow<'static, str>,
+    current: Arc<FetchedUsernamePasswordCredential>,
 }
 
 impl UsernamePasswordCredential {
     pub fn new(
         username: impl Into<Cow<'static, str>>,
         password: impl Into<Cow<'static, str>>,
-    ) -> Arc<UsernamePasswordCredential> {
-        Arc::new(UsernamePasswordCredential {
-            current_username: username.into(),
-            current_password: password.into(),
-        })
+    ) -> Self {
+        Self {
+            current: Arc::new(FetchedUsernamePasswordCredential {
+                username: username.into(),
+                password: password.into(),
+            }),
+        }
     }
 }
 
-impl AuthenticationCredential for UsernamePasswordCredential {}
+impl AuthenticationCredential for UsernamePasswordCredential {
+    type Fetch = Arc<FetchedUsernamePasswordCredential>;
 
-impl AuthenticationCredentialUsernamePassword for UsernamePasswordCredential {
+    fn fetch(&self) -> Result<Self::Fetch, AuthenticError> {
+        Ok(self.current.clone())
+    }
+}
+
+impl FetchedUsernamePassword for Arc<FetchedUsernamePasswordCredential> {
     fn username(&self) -> &str {
-        self.current_username.as_ref()
+        self.username.as_ref()
     }
     fn password(&self) -> &str {
-        self.current_password.as_ref()
+        self.password.as_ref()
     }
 }
 
@@ -72,20 +100,32 @@ impl AuthenticationCredentialUsernamePassword for UsernamePasswordCredential {
 ///
 /// For HTTP authentication, this selects the correct username/password credential for the realm
 /// returned by the `www-authenticate` header.
-pub struct HttpRealmCredentials<Credential> {
+pub struct FetchedHttpRealmCredentials<Credential> {
     realm_credentials: HashMap<Cow<'static, str>, Arc<Credential>>,
 }
 
-impl<Credential> HttpRealmCredentials<Credential> {
-    pub fn new(
-        realm_credentials: HashMap<Cow<'static, str>, Arc<Credential>>,
-    ) -> Arc<HttpRealmCredentials<Credential>> {
-        Arc::new(HttpRealmCredentials { realm_credentials })
-    }
+pub struct HttpRealmCredentials<Credential> {
+    current: Arc<FetchedHttpRealmCredentials<Credential>>,
+}
 
-    pub fn get_credential(&self, realm: &str) -> Option<&Arc<Credential>> {
-        self.realm_credentials.get(realm)
+impl<Credential> HttpRealmCredentials<Credential> {
+    pub fn new(realm_credentials: HashMap<Cow<'static, str>, Arc<Credential>>) -> Self {
+        Self {
+            current: Arc::new(FetchedHttpRealmCredentials { realm_credentials }),
+        }
     }
 }
 
-impl<Credential> AuthenticationCredential for HttpRealmCredentials<Credential> {}
+impl<Credential> AuthenticationCredential for HttpRealmCredentials<Credential> {
+    type Fetch = Arc<FetchedHttpRealmCredentials<Credential>>;
+
+    fn fetch(&self) -> Result<Self::Fetch, AuthenticError> {
+        Ok(self.current.clone())
+    }
+}
+
+impl<Credential> FetchedHttpRealmCredentials<Credential> {
+    pub fn credential(&self, realm: &str) -> Option<&Arc<Credential>> {
+        self.realm_credentials.get(realm)
+    }
+}

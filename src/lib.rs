@@ -10,17 +10,18 @@
 //!
 //! ```ignore
 //! // One-time code:
-//! let client = ::reqwest::blocking::Client::new();
+//! let client = reqwest::blocking::Client::new();
 //!
 //! let mut realm_credentials = HashMap::new();
 //! realm_credentials.insert(
 //!     "Fake Realm".into(),
-//!     UsernamePasswordCredential::new("username", "password"),
+//!     Arc::new(UsernamePasswordCredential::new("username", "password")),
 //! );
-//! let credential = HttpRealmCredentials::new(realm_credentials);
+//! let credential = Arc::new(HttpRealmCredentials::new(realm_credentials));
 //!
 //! // Per-request code:
-//! let mut authentication = HttpAuthentication::new(&credential);
+//! let mut authentication = HttpAuthentication::new(credential);
+//!
 //! let response = loop {
 //!     while let Some(auth_step) = authentication.step()? {
 //!         match auth_step {
@@ -34,10 +35,10 @@
 //!         }
 //!     }
 //!
-//!    let response = client
-//!        .get("https://httpbin.org/basic-auth/username/password")
-//!        .with_authentication(&authentication)?
-//!        .send()?;
+//!     let response = client
+//!         .get("https://httpbin.org/basic-auth/username/password")
+//!         .with_authentication(&authentication)?
+//!         .send()?;
 //!
 //!     if authentication.has_completed(&response)? {
 //!         break response;
@@ -104,7 +105,7 @@ pub trait AuthenticationProtocol {
     type Response;
     type Error;
 
-    fn step(&mut self) -> Result<Option<AuthenticationStep<Self::Request>>, AuthenticError> {
+    fn step(&self) -> Result<Option<AuthenticationStep<Self::Request>>, AuthenticError> {
         Ok(None)
     }
 

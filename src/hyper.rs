@@ -7,7 +7,7 @@ use std::sync::Arc;
 use http::HeaderValue;
 
 use crate::credential::{
-    AuthenticationCredentialToken, AuthenticationCredentialUsernamePassword, HttpRealmCredentials,
+    AuthenticationCredential, FetchedToken, FetchedUsernamePassword, HttpRealmCredentials,
 };
 use crate::{
     AuthenticError, AuthenticationProtocol, AuthenticationProtocolConfigure, AuthenticationStep,
@@ -41,35 +41,46 @@ pub struct HeaderAuthentication<Credential> {
 
 impl<Credential: 'static> HeaderAuthentication<Credential>
 where
-    Credential: AuthenticationCredentialToken,
+    Credential: AuthenticationCredential,
+    <Credential as AuthenticationCredential>::Fetch: FetchedToken,
 {
-    pub fn new(header_name: impl Into<Cow<'static, str>>, credential: &Arc<Credential>) -> Self {
+    pub fn new(header_name: impl Into<Cow<'static, str>>, credential: Arc<Credential>) -> Self {
         Self {
             header_name: header_name.into(),
-            credential: credential.clone(),
+            credential: credential,
         }
     }
 }
 
 impl<Credential> AuthenticationProtocol for HeaderAuthentication<Credential>
 where
-    Credential: AuthenticationCredentialToken,
+    Credential: AuthenticationCredential,
+    <Credential as AuthenticationCredential>::Fetch: FetchedToken,
 {
     type Request = hyper::Request<hyper::Body>;
     type Response = hyper::Response<hyper::Body>;
     type Error = hyper::Error;
+
+    fn step(&self) -> Result<Option<AuthenticationStep<Self::Request>>, AuthenticError> {
+        match self.credential.auth_step() {
+            Ok(duration) if duration.is_zero() => Ok(None),
+            Ok(duration) => Ok(Some(AuthenticationStep::WaitFor(duration))),
+            Err(err) => Err(err),
+        }
+    }
 }
 
 impl<Credential> AuthenticationProtocolConfigure<http::request::Builder>
     for HeaderAuthentication<Credential>
 where
-    Credential: AuthenticationCredentialToken,
+    Credential: AuthenticationCredential,
+    <Credential as AuthenticationCredential>::Fetch: FetchedToken,
 {
     fn configure(
         &self,
         builder: http::request::Builder,
     ) -> Result<http::request::Builder, AuthenticError> {
-        let mut header_value = HeaderValue::try_from(self.credential.token()?.as_slice())?;
+        let mut header_value = HeaderValue::try_from(self.credential.fetch()?.token())?;
         header_value.set_sensitive(true);
         Ok(builder.header(self.header_name.as_ref(), header_value))
     }
@@ -81,14 +92,15 @@ pub struct BearerAuthentication<Credential> {
     credential: Arc<Credential>,
 }
 
-impl<Credential: 'static> BearerAuthentication<Credential>
+impl<Credential> BearerAuthentication<Credential>
 where
-    Credential: AuthenticationCredentialToken,
+    Credential: AuthenticationCredential,
+    <Credential as AuthenticationCredential>::Fetch: FetchedToken,
 {
-    pub fn new(credential: &Arc<Credential>) -> Self {
+    pub fn new(credential: Arc<Credential>) -> Self {
         Self {
             auth_scheme: "Bearer".into(),
-            credential: credential.clone(),
+            credential,
         }
     }
 
@@ -104,27 +116,38 @@ where
 
 impl<Credential> AuthenticationProtocol for BearerAuthentication<Credential>
 where
-    Credential: AuthenticationCredentialToken,
+    Credential: AuthenticationCredential,
+    <Credential as AuthenticationCredential>::Fetch: FetchedToken,
 {
     type Request = hyper::Request<hyper::Body>;
     type Response = hyper::Response<hyper::Body>;
     type Error = hyper::Error;
+
+    fn step(&self) -> Result<Option<AuthenticationStep<Self::Request>>, AuthenticError> {
+        match self.credential.auth_step() {
+            Ok(duration) if duration.is_zero() => Ok(None),
+            Ok(duration) => Ok(Some(AuthenticationStep::WaitFor(duration))),
+            Err(err) => Err(err),
+        }
+    }
 }
 
 impl<Credential> AuthenticationProtocolConfigure<http::request::Builder>
     for BearerAuthentication<Credential>
 where
-    Credential: AuthenticationCredentialToken,
+    Credential: AuthenticationCredential,
+    <Credential as AuthenticationCredential>::Fetch: FetchedToken,
 {
     fn configure(
         &self,
         builder: http::request::Builder,
     ) -> Result<http::request::Builder, AuthenticError> {
-        let token = self.credential.token()?;
+        let fetched = self.credential.fetch()?;
+        let token = fetched.token();
         let mut value = Vec::with_capacity(self.auth_scheme.len() + 1 + token.len());
         value.extend(self.auth_scheme.as_bytes());
         value.push(b' ');
-        value.extend(token.as_slice());
+        value.extend(token);
         let mut header_value = HeaderValue::try_from(value)?;
         header_value.set_sensitive(true);
         Ok(builder.header(hyper::header::AUTHORIZATION, header_value))
@@ -136,39 +159,42 @@ pub struct BasicAuthentication<Credential> {
     credential: Arc<Credential>,
 }
 
-impl<Credential> BasicAuthentication<Credential>
-where
-    Credential: AuthenticationCredentialUsernamePassword + 'static,
-{
-    pub fn new(credential: &Arc<Credential>) -> Self {
-        Self {
-            credential: credential.clone(),
-        }
+impl<Credential> BasicAuthentication<Credential> {
+    pub fn new(credential: Arc<Credential>) -> Self {
+        Self { credential }
     }
 }
 
 impl<Credential> AuthenticationProtocol for BasicAuthentication<Credential>
 where
-    Credential: AuthenticationCredentialUsernamePassword,
+    Credential: AuthenticationCredential,
+    <Credential as AuthenticationCredential>::Fetch: FetchedUsernamePassword,
 {
     type Request = hyper::Request<hyper::Body>;
     type Response = hyper::Response<hyper::Body>;
     type Error = hyper::Error;
+
+    fn step(&self) -> Result<Option<AuthenticationStep<Self::Request>>, AuthenticError> {
+        match self.credential.auth_step() {
+            Ok(duration) if duration.is_zero() => Ok(None),
+            Ok(duration) => Ok(Some(AuthenticationStep::WaitFor(duration))),
+            Err(err) => Err(err),
+        }
+    }
 }
 
 impl<Credential> AuthenticationProtocolConfigure<http::request::Builder>
     for BasicAuthentication<Credential>
 where
-    Credential: AuthenticationCredentialUsernamePassword,
+    Credential: AuthenticationCredential,
+    <Credential as AuthenticationCredential>::Fetch: FetchedUsernamePassword,
 {
     fn configure(
         &self,
         builder: http::request::Builder,
     ) -> Result<http::request::Builder, AuthenticError> {
-        let value = ::http_auth::basic::encode_credentials(
-            self.credential.username(),
-            self.credential.password(),
-        );
+        let fetched = self.credential.fetch()?;
+        let value = ::http_auth::basic::encode_credentials(fetched.username(), fetched.password());
         let mut header_value = HeaderValue::try_from(value)?;
         header_value.set_sensitive(true);
         Ok(builder.header(hyper::header::AUTHORIZATION, header_value))
@@ -186,20 +212,21 @@ pub enum HttpAuthentication<Credential> {
 }
 
 impl<Credential> HttpAuthentication<Credential> {
-    pub fn new(credential: &Arc<HttpRealmCredentials<Credential>>) -> Self {
-        Self::Initial(credential.clone())
+    pub fn new(credential: Arc<HttpRealmCredentials<Credential>>) -> Self {
+        Self::Initial(credential)
     }
 }
 
 impl<Credential> AuthenticationProtocol for HttpAuthentication<Credential>
 where
-    Credential: AuthenticationCredentialUsernamePassword + 'static,
+    Credential: AuthenticationCredential,
+    <Credential as AuthenticationCredential>::Fetch: FetchedUsernamePassword,
 {
     type Request = hyper::Request<hyper::Body>;
     type Response = hyper::Response<hyper::Body>;
     type Error = hyper::Error;
 
-    fn step(&mut self) -> Result<Option<AuthenticationStep<Self::Request>>, AuthenticError> {
+    fn step(&self) -> Result<Option<AuthenticationStep<Self::Request>>, AuthenticError> {
         match self {
             Self::Initial(_) => Ok(None),
             Self::Basic(basic) => basic.step(),
@@ -226,9 +253,11 @@ where
                     match pw_client {
                         http_auth::PasswordClient::Basic(client) => {
                             let realm = client.realm();
-                            match realm_credentials.get_credential(realm) {
+                            let fetched = realm_credentials.fetch()?;
+                            match fetched.credential(realm) {
                                 Some(credential) => {
-                                    *self = Self::Basic(BasicAuthentication::new(credential));
+                                    *self =
+                                        Self::Basic(BasicAuthentication::new(credential.clone()));
                                     Ok(false)
                                 }
                                 None => Err(AuthenticError::UnknownRealm(realm.to_owned())),
@@ -249,7 +278,8 @@ where
 impl<Credential> AuthenticationProtocolConfigure<http::request::Builder>
     for HttpAuthentication<Credential>
 where
-    Credential: AuthenticationCredentialUsernamePassword,
+    Credential: AuthenticationCredential,
+    <Credential as AuthenticationCredential>::Fetch: FetchedUsernamePassword,
 {
     fn configure(
         &self,

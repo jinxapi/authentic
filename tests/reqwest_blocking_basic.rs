@@ -1,6 +1,7 @@
 #![cfg(feature = "reqwest_blocking")]
 
 use std::collections::HashMap;
+use std::sync::Arc;
 
 use authentic::credential::{HttpRealmCredentials, UsernamePasswordCredential};
 use authentic::reqwest::blocking::{BasicAuthentication, HttpAuthentication};
@@ -13,8 +14,8 @@ use http::StatusCode;
 fn test_basic_builder() -> Result<(), Box<dyn std::error::Error>> {
     let client = reqwest::blocking::Client::new();
 
-    let credential = UsernamePasswordCredential::new("username", "password");
-    let mut authentication = BasicAuthentication::new(&credential);
+    let credential = Arc::new(UsernamePasswordCredential::new("username", "password"));
+    let mut authentication = BasicAuthentication::new(credential);
 
     let mut status_codes = Vec::new();
 
@@ -56,8 +57,8 @@ fn test_basic_builder() -> Result<(), Box<dyn std::error::Error>> {
 fn test_basic_request() -> Result<(), Box<dyn std::error::Error>> {
     let client = reqwest::blocking::Client::new();
 
-    let credential = UsernamePasswordCredential::new("username", "password");
-    let mut authentication = BasicAuthentication::new(&credential);
+    let credential = Arc::new(UsernamePasswordCredential::new("username", "password"));
+    let mut authentication = BasicAuthentication::new(credential);
 
     let mut status_codes = Vec::new();
 
@@ -105,10 +106,10 @@ fn test_basic_challenge() -> Result<(), Box<dyn std::error::Error>> {
     let mut realm_credentials = HashMap::new();
     realm_credentials.insert(
         "Fake Realm".into(),
-        UsernamePasswordCredential::new("username", "password"),
+        Arc::new(UsernamePasswordCredential::new("username", "password")),
     );
-    let credential = HttpRealmCredentials::new(realm_credentials);
-    let mut authentication = HttpAuthentication::new(&credential);
+    let credential = Arc::new(HttpRealmCredentials::new(realm_credentials));
+    let mut authentication = HttpAuthentication::new(credential);
 
     let mut status_codes = Vec::new();
 

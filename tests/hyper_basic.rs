@@ -1,6 +1,7 @@
 #![cfg(feature = "hyper")]
 
 use std::collections::HashMap;
+use std::sync::Arc;
 
 use authentic::credential::{HttpRealmCredentials, UsernamePasswordCredential};
 use authentic::hyper::{BasicAuthentication, HttpAuthentication};
@@ -16,8 +17,8 @@ async fn test_basic_authentication(
     let https = HttpsConnector::new();
     let client = Client::builder().build::<_, ::hyper::Body>(https);
 
-    let credential = UsernamePasswordCredential::new("username", "password");
-    let mut authentication = BasicAuthentication::new(&credential);
+    let credential = Arc::new(UsernamePasswordCredential::new("username", "password"));
+    let mut authentication = BasicAuthentication::new(credential);
 
     let mut status_codes = Vec::new();
 
@@ -64,10 +65,10 @@ async fn test_basic_challenge() -> Result<(), Box<dyn std::error::Error + Send +
     let mut realm_credentials = HashMap::new();
     realm_credentials.insert(
         "Fake Realm".into(),
-        UsernamePasswordCredential::new("username", "password"),
+        Arc::new(UsernamePasswordCredential::new("username", "password")),
     );
-    let credential = HttpRealmCredentials::new(realm_credentials);
-    let mut authentication = HttpAuthentication::new(&credential);
+    let credential = Arc::new(HttpRealmCredentials::new(realm_credentials));
+    let mut authentication = HttpAuthentication::new(credential);
 
     let mut status_codes = Vec::new();
 
