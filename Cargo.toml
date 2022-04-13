@@ -16,12 +16,16 @@ all-features = true
 hyper_async = ["hyper"]
 reqwest_async = ["reqwest"]
 reqwest_blocking = ["reqwest/blocking"]
+jwt = ["jsonwebtoken", "arc-swap", "serde/derive"]
 
 [dependencies]
+arc-swap = { version = "1.5.0", optional = true }
 http = "0.2.6"
 http-auth = { version = "0.1.5", features = ["basic-scheme", "http"] }
 hyper = { version = "0.14", optional = true }
+jsonwebtoken = { version = "8", optional = true }
 reqwest = { version = "0.11", optional = true }
+serde = {version = "1.0", optional = true }
 thiserror = "1"
 
 [dev-dependencies]

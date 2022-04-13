@@ -121,7 +121,7 @@ where
     pub fn new(credential: Arc<Credential>) -> Self {
         Self {
             auth_scheme: "Bearer".into(),
-            credential: credential,
+            credential,
         }
     }
 
