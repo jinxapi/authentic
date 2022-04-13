@@ -88,6 +88,13 @@ pub enum AuthenticError {
     #[error("Reqwest error")]
     Reqwest(#[from] ::reqwest::Error),
 
+    #[cfg(feature = "jwt")]
+    #[error("JWT encoding error")]
+    JsonWebToken(#[from] ::jsonwebtoken::errors::Error),
+
+    #[error("System time error")]
+    SystemTime(#[from] ::std::time::SystemTimeError),
+
     #[error("No credentials found for realm {0:?}")]
     UnknownRealm(String),
 

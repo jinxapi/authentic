@@ -47,7 +47,7 @@ where
     pub fn new(header_name: impl Into<Cow<'static, str>>, credential: Arc<Credential>) -> Self {
         Self {
             header_name: header_name.into(),
-            credential: credential,
+            credential,
         }
     }
 }

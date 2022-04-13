@@ -56,6 +56,128 @@ impl FetchedToken for Arc<FetchedTokenCredential> {
     }
 }
 
+#[cfg(feature = "jwt")]
+pub struct FetchedJsonWebTokenCredential {
+    token: Vec<u8>,
+    renew: std::time::SystemTime,
+    expiry: std::time::SystemTime,
+}
+
+#[cfg(feature = "jwt")]
+pub struct JsonWebTokenCredential {
+    current: arc_swap::ArcSwapOption<FetchedJsonWebTokenCredential>,
+    renewing: std::sync::Mutex<()>,
+    header: jsonwebtoken::Header,
+    key: jsonwebtoken::EncodingKey,
+    expiration: Duration,
+    jwt_iss: Option<Cow<'static, str>>,
+}
+
+#[cfg(feature = "jwt")]
+impl JsonWebTokenCredential {
+    pub fn new(
+        header: jsonwebtoken::Header,
+        key: jsonwebtoken::EncodingKey,
+        expiration: Duration,
+    ) -> Self {
+        Self {
+            current: arc_swap::ArcSwapOption::from(None),
+            renewing: std::sync::Mutex::new(()),
+            header,
+            key,
+            expiration,
+            jwt_iss: None,
+        }
+    }
+
+    #[must_use]
+    pub fn with_issuer(mut self, issuer: impl Into<Cow<'static, str>>) -> Self {
+        self.jwt_iss = Some(issuer.into());
+        self
+    }
+}
+
+#[cfg(feature = "jwt")]
+#[derive(Debug, serde::Serialize)]
+struct JWTClaims {
+    iat: usize,
+    exp: usize,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    iss: Option<Cow<'static, str>>,
+}
+
+#[cfg(feature = "jwt")]
+impl AuthenticationCredential for JsonWebTokenCredential {
+    fn auth_step(&self) -> Result<Duration, AuthenticError> {
+        let now = std::time::SystemTime::now();
+        let current_is_valid = {
+            let guard = self.current.load();
+            if let Some(current) = &*guard {
+                dbg!(now, current.renew, current.expiry);
+                if now < current.renew {
+                    return Ok(Duration::ZERO);
+                } else {
+                    now < current.expiry
+                }
+            } else {
+                false
+            }
+        };
+        match self.renewing.try_lock() {
+            Ok(_guard) => {
+                // create new token
+                println!("Renewing JWT");
+                let exp = now + self.expiration;
+                let claims = JWTClaims {
+                    iat: now
+                        .duration_since(std::time::SystemTime::UNIX_EPOCH)?
+                        .as_secs() as usize,
+                    exp: exp
+                        .duration_since(std::time::SystemTime::UNIX_EPOCH)?
+                        .as_secs() as usize,
+                    iss: self.jwt_iss.clone(),
+                };
+                let token = jsonwebtoken::encode(&self.header, &claims, &self.key)?;
+                let renew = now + self.expiration / 2;
+                let fetched = FetchedJsonWebTokenCredential {
+                    token: token.into_bytes(),
+                    renew,
+                    expiry: exp,
+                };
+                self.current.store(Some(Arc::new(fetched)));
+                Ok(Duration::ZERO)
+            }
+            Err(std::sync::TryLockError::WouldBlock) => {
+                if current_is_valid {
+                    // existing credential still valid
+                    Ok(Duration::ZERO)
+                } else {
+                    // wait for lock holder to refresh token
+                    Ok(Duration::from_millis(10))
+                }
+            }
+            Err(std::sync::TryLockError::Poisoned(poison)) => {
+                Err(AuthenticError::Other(poison.to_string()))
+            }
+        }
+    }
+
+    type Fetch = Arc<FetchedJsonWebTokenCredential>;
+
+    fn fetch(&self) -> Result<Self::Fetch, AuthenticError> {
+        self.current
+            .load_full()
+            .ok_or_else(|| AuthenticError::Other("Unexpected None".to_owned()))
+    }
+}
+
+#[cfg(feature = "jwt")]
+impl FetchedToken for Arc<FetchedJsonWebTokenCredential> {
+    fn token(&self) -> &[u8] {
+        &self.token
+    }
+}
+
 pub struct FetchedUsernamePasswordCredential {
     username: Cow<'static, str>,
     password: Cow<'static, str>,
