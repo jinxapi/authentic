@@ -8,10 +8,23 @@ use crate::AuthenticError;
 pub trait AuthenticationCredential {
     type Fetch;
 
+    /// Called to perform any processing required for a credential.
+    ///
+    /// Returns `Ok(Duration::ZERO)` if no further processing is required.  Returns a non-zero
+    /// duration if the caller should wait for the duration and call this method again.
     fn auth_step(&self) -> Result<Duration, AuthenticError> {
         Ok(Duration::ZERO)
     }
 
+    /// Get an object containing the credentials to use for an operation.
+    ///
+    /// Some credentials get rotated over time, so each call may use different credentials.
+    /// Calling `fetch` returns an object with a consistent set of credentials to use for a
+    /// single operation.
+    ///
+    /// The returned object typically owns the credentials, or an `Arc` pointing to them. This
+    /// ensures that the current credentials live for the duration of the operation, without being
+    /// affected by renewals.
     fn fetch(&self) -> Result<Self::Fetch, AuthenticError>;
 }
 
@@ -24,10 +37,12 @@ pub trait FetchedUsernamePassword {
     fn password(&self) -> &str;
 }
 
+/// An implementation of [`FetchedToken`] returned from [`TokenCredential`].
 pub struct FetchedTokenCredential {
     token: Cow<'static, [u8]>,
 }
 
+/// Credential wrapping a token to be used as an API key header or for Bearer authentication.
 pub struct TokenCredential {
     current: Arc<FetchedTokenCredential>,
 }
@@ -57,6 +72,7 @@ impl FetchedToken for Arc<FetchedTokenCredential> {
 }
 
 #[cfg(feature = "jwt")]
+/// An implementation of [`FetchedToken`] returned from [`JsonWebTokenCredential`].
 pub struct FetchedJsonWebTokenCredential {
     token: Vec<u8>,
     renew: std::time::SystemTime,
@@ -64,6 +80,11 @@ pub struct FetchedJsonWebTokenCredential {
 }
 
 #[cfg(feature = "jwt")]
+/// Credential wrapping a JWT (JSON Web Token).
+///
+/// From a private secret or private key, this will create short-lived tokens in JWT format.
+/// The credential can be used indefintely, but the underlying token will be rotated before it
+/// expires.
 pub struct JsonWebTokenCredential {
     current: arc_swap::ArcSwapOption<FetchedJsonWebTokenCredential>,
     // Mutex to be held while renewing. Contains a copy of the renew time
@@ -77,6 +98,13 @@ pub struct JsonWebTokenCredential {
 
 #[cfg(feature = "jwt")]
 impl JsonWebTokenCredential {
+    /// Create a JWT credential with specific properties.
+    ///
+    /// The `header` and `key` parameters are set as for [`jsonwebtoken`].
+    ///
+    /// The `expiration` parameter controls how long the token will be valid. Endpoints may restrict
+    /// tokens to a maximum lifetime. Tokens are rotated after half the expiration time, to ensure
+    /// that they have a reasonable remaining time to be used.
     pub fn new(
         header: jsonwebtoken::Header,
         key: jsonwebtoken::EncodingKey,
@@ -188,11 +216,14 @@ impl FetchedToken for Arc<FetchedJsonWebTokenCredential> {
     }
 }
 
+/// An implementation of [`FetchedUsernamePassword`] returned from [`UsernamePasswordCredential`].
+
 pub struct FetchedUsernamePasswordCredential {
     username: Cow<'static, str>,
     password: Cow<'static, str>,
 }
 
+/// Credential wrapping a username and password.
 pub struct UsernamePasswordCredential {
     current: Arc<FetchedUsernamePasswordCredential>,
 }
@@ -228,19 +259,26 @@ impl FetchedUsernamePassword for Arc<FetchedUsernamePasswordCredential> {
     }
 }
 
-/// Credential mapping realms to username/password credentials.
-///
-/// For HTTP authentication, this selects the correct username/password credential for the realm
-/// returned by the `www-authenticate` header.
 pub struct FetchedHttpRealmCredentials<Credential> {
     realm_credentials: HashMap<Cow<'static, str>, Arc<Credential>>,
 }
 
+/// Map of realms to another type of credential.
+///
+/// For HTTP authentication, this selects the correct credential for the realm
+/// returned by the `www-authenticate` header.
 pub struct HttpRealmCredentials<Credential> {
     current: Arc<FetchedHttpRealmCredentials<Credential>>,
 }
 
 impl<Credential> HttpRealmCredentials<Credential> {
+    /// Create a set of credentials mapped to HTTP realms.
+    ///
+    /// When a `www-authenticate` header is returned from a HTTP request, the realm will
+    /// be used to select the appropriate credentials for a subsequent request.
+    ///
+    /// Takes a HashMap mapping realm names to another credential type. For example, for HTTP Basic
+    /// authentication each realm maps to a [`UsernamePasswordCredential`].
     pub fn new(realm_credentials: HashMap<Cow<'static, str>, Arc<Credential>>) -> Self {
         Self {
             current: Arc::new(FetchedHttpRealmCredentials { realm_credentials }),
@@ -257,6 +295,9 @@ impl<Credential> AuthenticationCredential for HttpRealmCredentials<Credential> {
 }
 
 impl<Credential> FetchedHttpRealmCredentials<Credential> {
+    /// Get the correct credential for a specified realm.
+    ///
+    /// Returns `None` if no credential has been specified for the realm.
     pub fn credential(&self, realm: &str) -> Option<&Arc<Credential>> {
         self.realm_credentials.get(realm)
     }
