@@ -6,9 +6,7 @@ use std::sync::Arc;
 
 use http::HeaderValue;
 
-use crate::credential::{
-    AuthenticationCredential, FetchedToken, FetchedUsernamePassword, HttpRealmCredentials,
-};
+use crate::credential::{AuthenticationCredential, FetchedToken, FetchedUsernamePassword};
 use crate::{
     AuthenticError, AuthenticationProtocol, AuthenticationProtocolConfigure, AuthenticationStep,
 };
@@ -203,20 +201,25 @@ where
 
 /// Authentication using HTTP Basic authentication to respond to a challenge.
 ///
+/// Requires feature `loop` (enabled by default).
+///
 /// This currently only supports Basic authentication.
 ///
 /// This limitation is expected to be removed in a future version.
+#[cfg(feature = "loop")]
 pub enum HttpAuthentication<Credential> {
-    Initial(Arc<HttpRealmCredentials<Credential>>),
+    Initial(Arc<crate::credential::HttpRealmCredentials<Credential>>),
     Basic(BasicAuthentication<Credential>),
 }
 
+#[cfg(feature = "loop")]
 impl<Credential> HttpAuthentication<Credential> {
-    pub fn new(credential: Arc<HttpRealmCredentials<Credential>>) -> Self {
+    pub fn new(credential: Arc<crate::credential::HttpRealmCredentials<Credential>>) -> Self {
         Self::Initial(credential)
     }
 }
 
+#[cfg(feature = "loop")]
 impl<Credential> AuthenticationProtocol for HttpAuthentication<Credential>
 where
     Credential: AuthenticationCredential,
@@ -275,6 +278,7 @@ where
     }
 }
 
+#[cfg(feature = "loop")]
 impl<Credential> AuthenticationProtocolConfigure<http::request::Builder>
     for HttpAuthentication<Credential>
 where

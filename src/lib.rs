@@ -59,6 +59,44 @@
 //! As the request needs to be retried, `has_completed()` returns `false` and a second iteration begins.
 //!
 //! On the second iteration of the loop, `with_authentication()` adds the credentials as the `Authorization` header to the request. The request is authenticated and the response contains the correct data. `has_completed()` will return `true` and the loop exits with the response.
+//!
+//! ## Removing the loop
+//!
+//! The above pre-request code works for all supported authentication methods, although different credentials may be required for other methods.
+//!
+//! If the default `loop` feature is disabled, then the outer loop is not required.
+//! This can simplify the code, particularly if the loop causes a request body to be cloned, but reduces the supported authentication methods.
+//!
+//! For example, if an API always requires basic authentication with specific credentials, the code can be simplified to:
+//!
+//! ```ignore
+//! // One-time code:
+//! let client = reqwest::blocking::Client::new();
+//!
+//! let credential = Arc::new(UsernamePasswordCredential::new("username", "password"));
+//!
+//! // Per-request code:
+//! let mut authentication = BasicAuthentication::new(credential);
+//!
+//! while let Some(auth_step) = authentication.step()? {
+//!     match auth_step {
+//!         AuthenticationStep::Request(request) => {
+//!             let auth_response = client.execute(request);
+//!             authentication.respond(auth_response);
+//!         }
+//!         AuthenticationStep::WaitFor(duration) => {
+//!             std::thread::sleep(duration);
+//!         }
+//!     }
+//! }
+//!
+//! let response = client
+//!     .get("https://httpbin.org/basic-auth/username/password")
+//!     .with_authentication(&authentication)?
+//!     .send()?;
+//! ```
+//!
+//! (Since basic authentication currently makes no use of the `step` method, technically the inner loop could also be removed, but this is not guaranteed to be true).
 
 use std::time::Duration;
 
