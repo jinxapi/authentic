@@ -1,10 +1,9 @@
 #![cfg(feature = "reqwest_blocking")]
 
-use std::collections::HashMap;
 use std::sync::Arc;
 
-use authentic::credential::{HttpRealmCredentials, UsernamePasswordCredential};
-use authentic::reqwest::blocking::{BasicAuthentication, HttpAuthentication};
+use authentic::credential::UsernamePasswordCredential;
+use authentic::reqwest::blocking::BasicAuthentication;
 use authentic::{AuthenticationProtocol, AuthenticationStep, WithAuthentication};
 use http::StatusCode;
 
@@ -17,35 +16,27 @@ fn test_basic_builder() -> Result<(), Box<dyn std::error::Error>> {
     let credential = Arc::new(UsernamePasswordCredential::new("username", "password"));
     let mut authentication = BasicAuthentication::new(credential);
 
-    let mut status_codes = Vec::new();
-
-    let _response = loop {
-        while let Some(auth_step) = authentication.step()? {
-            match auth_step {
-                AuthenticationStep::Request(request) => {
-                    let auth_response = client.execute(request);
-                    authentication.respond(auth_response);
-                }
-                AuthenticationStep::WaitFor(duration) => {
-                    std::thread::sleep(duration);
-                }
+    while let Some(auth_step) = authentication.step()? {
+        match auth_step {
+            AuthenticationStep::Request(request) => {
+                let auth_response = client.execute(request);
+                authentication.respond(auth_response);
+            }
+            AuthenticationStep::WaitFor(duration) => {
+                std::thread::sleep(duration);
             }
         }
-        let response = client
-            .get("https://httpbin.org/basic-auth/username/password")
-            .with_authentication(&authentication)?
-            .send()?;
+    }
+    let response = client
+        .get("https://httpbin.org/basic-auth/username/password")
+        .with_authentication(&authentication)?
+        .send()?;
 
-        dbg!(&response);
+    dbg!(&response);
 
-        status_codes.push(response.status());
+    assert!(authentication.has_completed(&response)?);
 
-        if authentication.has_completed(&response)? {
-            break response;
-        }
-    };
-
-    assert_eq!(status_codes, [StatusCode::OK]);
+    assert_eq!(response.status(), StatusCode::OK);
 
     Ok(())
 }
@@ -99,17 +90,22 @@ fn test_basic_request() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 /// Basic authentication passing the username and password in response to a 401 challenge.
+///
+/// `HttpAuthentication` is only supported with the `loop` feature.
+#[cfg(feature = "loop")]
 #[test]
 fn test_basic_challenge() -> Result<(), Box<dyn std::error::Error>> {
     let client = reqwest::blocking::Client::new();
 
-    let mut realm_credentials = HashMap::new();
+    let mut realm_credentials = std::collections::HashMap::new();
     realm_credentials.insert(
         "Fake Realm".into(),
         Arc::new(UsernamePasswordCredential::new("username", "password")),
     );
-    let credential = Arc::new(HttpRealmCredentials::new(realm_credentials));
-    let mut authentication = HttpAuthentication::new(credential);
+    let credential = Arc::new(authentic::credential::HttpRealmCredentials::new(
+        realm_credentials,
+    ));
+    let mut authentication = authentic::reqwest::blocking::HttpAuthentication::new(credential);
 
     let mut status_codes = Vec::new();
 
