@@ -20,7 +20,7 @@
 //! let credential = Arc::new(HttpRealmCredentials::new(realm_credentials));
 //!
 //! // Per-request code:
-//! let mut authentication = HttpAuthentication::new(credential);
+//! let mut authentication = HttpAuthentication::new(credential.clone());
 //!
 //! let response = loop {
 //!     while let Some(auth_step) = authentication.step()? {
@@ -60,23 +60,39 @@
 //!
 //! On the second iteration of the loop, `with_authentication()` adds the credentials as the `Authorization` header to the request. The request is authenticated and the response contains the correct data. `has_completed()` will return `true` and the loop exits with the response.
 //!
-//! ## Removing the loop
+//! ## HTTP library features
 //!
-//! The above pre-request code works for all supported authentication methods, although different credentials may be required for other methods.
+//! `authentic` supports asynchronous code using `hyper` or `reqwest`, and blocking code using `reqwest`.
 //!
-//! If the default `loop` feature is disabled, then the outer loop is not required.
-//! This can simplify the code, particularly if the loop causes a request body to be cloned, but reduces the supported authentication methods.
+//! Specify the library using the following features:
+//! - `hyper-client`
+//! - `reqwest-async`
+//! - `reqwest-blocking`
 //!
-//! For example, if an API always requires basic authentication with specific credentials, the code can be simplified to:
+//! ## Algorithm features
+//!
+//! The above per-request code works for all supported authentication methods, but requires both the `step` and `loop` features to be enabled.
+//!
+//! If the `loop` feature is not enabled, then the outer loop is not required.
+//!
+//! If the `step` feature is not enabled, then the inner `while` loop is not required.
+//!
+//! For example, a JWT credential requires the `step` feature, but does not require the `loop` feature.
+//! Hence the code can remove the outer loop.
+//! (Note that the JWT credential also requires the `jwt` feature.)
 //!
 //! ```ignore
 //! // One-time code:
 //! let client = reqwest::blocking::Client::new();
 //!
-//! let credential = Arc::new(UsernamePasswordCredential::new("username", "password"));
+//! let credential = Arc::new(JsonWebTokenCredential::new(
+//!     jsonwebtoken::Header::new(jsonwebtoken::Algorithm::RS256),
+//!     jsonwebtoken::EncodingKey::from_rsa_pem(private_key)?,
+//!     Duration::from_secs(10 * 60),
+//! ));
 //!
 //! // Per-request code:
-//! let mut authentication = BasicAuthentication::new(credential);
+//! let mut authentication = BearerAuthentication::new(credential.clone());
 //!
 //! while let Some(auth_step) = authentication.step()? {
 //!     match auth_step {
@@ -91,12 +107,39 @@
 //! }
 //!
 //! let response = client
+//!     .get(url)
+//!     .with_authentication(&authentication)?
+//!     .send()?;
+//! ```
+//!
+//! If an API always requires basic authentication with specific credentials, neither the `step` or `loop` features are required:
+//!
+//! ```ignore
+//! // One-time code:
+//! let client = reqwest::blocking::Client::new();
+//!
+//! let credential = Arc::new(UsernamePasswordCredential::new("username", "password"));
+//!
+//! // Per-request code:
+//! let mut authentication = BasicAuthentication::new(credential.clone());
+//!
+//! let response = client
 //!     .get("https://httpbin.org/basic-auth/username/password")
 //!     .with_authentication(&authentication)?
 //!     .send()?;
 //! ```
 //!
-//! (Since basic authentication currently makes no use of the `step` method, technically the inner loop could also be removed, but this is not guaranteed to be true).
+//! ## Supported combinations
+//!
+//! The supported algorithm-credential pairs, and the features required to enable them, are:
+//! - `NoAuthentication`
+//! - `BasicAuthentication<UsernamePasswordCredential>`
+//! - `BearerAuthentication<JsonWebTokenCredential>` (`features = ["jwt", "step"]`)
+//! - `BearerAuthentication<TokenCredential>`
+//! - `HeaderAuthentication<JsonWebTokenCredential>` (`features = ["jwt", "step"]`)
+//! - `HeaderAuthentication<TokenCredential>`
+//! - `HttpAuthentication<HttpRealmCredentials<UsernamePasswordCredential>>` (`features = ["loop"]`)
+//!
 
 use std::time::Duration;
 
@@ -190,12 +233,12 @@ where
 #[cfg(feature = "hyper")]
 impl WithAuthentication for http::request::Builder {}
 
-#[cfg(feature = "reqwest")]
+#[cfg(feature = "reqwest-async")]
 impl WithAuthentication for ::reqwest::RequestBuilder {}
-#[cfg(feature = "reqwest")]
+#[cfg(feature = "reqwest-async")]
 impl WithAuthentication for ::reqwest::Request {}
 
-#[cfg(feature = "reqwest_blocking")]
+#[cfg(feature = "reqwest-blocking")]
 impl WithAuthentication for ::reqwest::blocking::RequestBuilder {}
-#[cfg(feature = "reqwest_blocking")]
+#[cfg(feature = "reqwest-blocking")]
 impl WithAuthentication for ::reqwest::blocking::Request {}

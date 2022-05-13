@@ -1,5 +1,5 @@
 //! Authentication protocols for use with `reqwest`.
-//! Use the `reqwest_async` feature to enable these.
+//! Use the `reqwest-async` feature to enable these.
 
 use std::borrow::Cow;
 use std::sync::Arc;
@@ -9,7 +9,7 @@ use crate::{
     AuthenticError, AuthenticationProtocol, AuthenticationProtocolConfigure, AuthenticationStep,
 };
 
-#[cfg(feature = "reqwest_blocking")]
+#[cfg(feature = "reqwest-blocking")]
 pub mod blocking;
 
 /// Protocol for no authentication

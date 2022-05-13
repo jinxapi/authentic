@@ -1,10 +1,8 @@
-//! Authentication protocols for use with `hyper`.
-//! Use the `hyper-async` feature to enable these.
+//! Authentication protocols for use with `reqwest`.
+//! Use the `reqwest-async` feature to enable these.
 
 use std::borrow::Cow;
 use std::sync::Arc;
-
-use http::HeaderValue;
 
 use crate::credential::{AuthenticationCredential, FetchedToken, FetchedUsernamePassword};
 use crate::{
@@ -24,12 +22,14 @@ impl NoAuthentication {
 }
 
 impl AuthenticationProtocol for NoAuthentication {
-    type Request = hyper::Request<hyper::Body>;
-    type Response = hyper::Response<hyper::Body>;
-    type Error = hyper::Error;
+    type Request = reqwest::Request;
+    type Response = reqwest::Response;
+    type Error = reqwest::Error;
 }
 
-impl AuthenticationProtocolConfigure<http::request::Builder> for NoAuthentication {}
+impl AuthenticationProtocolConfigure<reqwest::RequestBuilder> for NoAuthentication {}
+
+impl AuthenticationProtocolConfigure<reqwest::Request> for NoAuthentication {}
 
 /// Authentication using a token in a specified header.
 pub struct HeaderAuthentication<Credential> {
@@ -37,7 +37,7 @@ pub struct HeaderAuthentication<Credential> {
     credential: Arc<Credential>,
 }
 
-impl<Credential: 'static> HeaderAuthentication<Credential>
+impl<Credential> HeaderAuthentication<Credential>
 where
     Credential: AuthenticationCredential,
     <Credential as AuthenticationCredential>::Fetch: FetchedToken,
@@ -55,9 +55,9 @@ where
     Credential: AuthenticationCredential,
     <Credential as AuthenticationCredential>::Fetch: FetchedToken,
 {
-    type Request = hyper::Request<hyper::Body>;
-    type Response = hyper::Response<hyper::Body>;
-    type Error = hyper::Error;
+    type Request = reqwest::Request;
+    type Response = reqwest::Response;
+    type Error = reqwest::Error;
 
     fn step(&self) -> Result<Option<AuthenticationStep<Self::Request>>, AuthenticError> {
         match self.credential.auth_step() {
@@ -68,7 +68,7 @@ where
     }
 }
 
-impl<Credential> AuthenticationProtocolConfigure<http::request::Builder>
+impl<Credential> AuthenticationProtocolConfigure<reqwest::RequestBuilder>
     for HeaderAuthentication<Credential>
 where
     Credential: AuthenticationCredential,
@@ -76,11 +76,29 @@ where
 {
     fn configure(
         &self,
-        builder: http::request::Builder,
-    ) -> Result<http::request::Builder, AuthenticError> {
-        let mut header_value = HeaderValue::try_from(self.credential.fetch()?.token())?;
+        builder: reqwest::RequestBuilder,
+    ) -> Result<reqwest::RequestBuilder, AuthenticError> {
+        let header_name = ::reqwest::header::HeaderName::try_from(self.header_name.as_ref())?;
+        let mut header_value =
+            ::reqwest::header::HeaderValue::try_from(self.credential.fetch()?.token())?;
         header_value.set_sensitive(true);
-        Ok(builder.header(self.header_name.as_ref(), header_value))
+        Ok(builder.header(header_name, header_value))
+    }
+}
+
+impl<Credential> AuthenticationProtocolConfigure<reqwest::Request>
+    for HeaderAuthentication<Credential>
+where
+    Credential: AuthenticationCredential,
+    <Credential as AuthenticationCredential>::Fetch: FetchedToken,
+{
+    fn configure(&self, mut builder: reqwest::Request) -> Result<reqwest::Request, AuthenticError> {
+        let header_name = ::reqwest::header::HeaderName::try_from(self.header_name.as_ref())?;
+        let mut header_value =
+            ::reqwest::header::HeaderValue::try_from(self.credential.fetch()?.token())?;
+        header_value.set_sensitive(true);
+        builder.headers_mut().append(header_name, header_value);
+        Ok(builder)
     }
 }
 
@@ -117,9 +135,9 @@ where
     Credential: AuthenticationCredential,
     <Credential as AuthenticationCredential>::Fetch: FetchedToken,
 {
-    type Request = hyper::Request<hyper::Body>;
-    type Response = hyper::Response<hyper::Body>;
-    type Error = hyper::Error;
+    type Request = reqwest::Request;
+    type Response = reqwest::Response;
+    type Error = reqwest::Error;
 
     fn step(&self) -> Result<Option<AuthenticationStep<Self::Request>>, AuthenticError> {
         match self.credential.auth_step() {
@@ -130,7 +148,7 @@ where
     }
 }
 
-impl<Credential> AuthenticationProtocolConfigure<http::request::Builder>
+impl<Credential> AuthenticationProtocolConfigure<reqwest::RequestBuilder>
     for BearerAuthentication<Credential>
 where
     Credential: AuthenticationCredential,
@@ -138,17 +156,39 @@ where
 {
     fn configure(
         &self,
-        builder: http::request::Builder,
-    ) -> Result<http::request::Builder, AuthenticError> {
+        builder: reqwest::RequestBuilder,
+    ) -> Result<reqwest::RequestBuilder, AuthenticError> {
         let fetched = self.credential.fetch()?;
         let token = fetched.token();
         let mut value = Vec::with_capacity(self.auth_scheme.len() + 1 + token.len());
         value.extend(self.auth_scheme.as_bytes());
         value.push(b' ');
         value.extend(token);
-        let mut header_value = HeaderValue::try_from(value)?;
+        let mut header_value = ::reqwest::header::HeaderValue::try_from(value)?;
         header_value.set_sensitive(true);
-        Ok(builder.header(hyper::header::AUTHORIZATION, header_value))
+        Ok(builder.header(reqwest::header::AUTHORIZATION, header_value))
+    }
+}
+
+impl<Credential> AuthenticationProtocolConfigure<reqwest::Request>
+    for BearerAuthentication<Credential>
+where
+    Credential: AuthenticationCredential,
+    <Credential as AuthenticationCredential>::Fetch: FetchedToken,
+{
+    fn configure(&self, mut builder: reqwest::Request) -> Result<reqwest::Request, AuthenticError> {
+        let fetched = self.credential.fetch()?;
+        let token = fetched.token();
+        let mut value = Vec::with_capacity(self.auth_scheme.len() + 1 + token.len());
+        value.extend(self.auth_scheme.as_bytes());
+        value.push(b' ');
+        value.extend(token);
+        let mut header_value = ::reqwest::header::HeaderValue::try_from(value)?;
+        header_value.set_sensitive(true);
+        builder
+            .headers_mut()
+            .append(reqwest::header::AUTHORIZATION, header_value);
+        Ok(builder)
     }
 }
 
@@ -157,7 +197,11 @@ pub struct BasicAuthentication<Credential> {
     credential: Arc<Credential>,
 }
 
-impl<Credential> BasicAuthentication<Credential> {
+impl<Credential> BasicAuthentication<Credential>
+where
+    Credential: AuthenticationCredential,
+    <Credential as AuthenticationCredential>::Fetch: FetchedUsernamePassword,
+{
     pub fn new(credential: Arc<Credential>) -> Self {
         Self { credential }
     }
@@ -168,9 +212,9 @@ where
     Credential: AuthenticationCredential,
     <Credential as AuthenticationCredential>::Fetch: FetchedUsernamePassword,
 {
-    type Request = hyper::Request<hyper::Body>;
-    type Response = hyper::Response<hyper::Body>;
-    type Error = hyper::Error;
+    type Request = reqwest::Request;
+    type Response = reqwest::Response;
+    type Error = reqwest::Error;
 
     fn step(&self) -> Result<Option<AuthenticationStep<Self::Request>>, AuthenticError> {
         match self.credential.auth_step() {
@@ -181,7 +225,7 @@ where
     }
 }
 
-impl<Credential> AuthenticationProtocolConfigure<http::request::Builder>
+impl<Credential> AuthenticationProtocolConfigure<reqwest::RequestBuilder>
     for BasicAuthentication<Credential>
 where
     Credential: AuthenticationCredential,
@@ -189,13 +233,28 @@ where
 {
     fn configure(
         &self,
-        builder: http::request::Builder,
-    ) -> Result<http::request::Builder, AuthenticError> {
+        builder: reqwest::RequestBuilder,
+    ) -> Result<reqwest::RequestBuilder, AuthenticError> {
+        let fetched = self.credential.fetch()?;
+        Ok(builder.basic_auth(fetched.username(), Some(fetched.password())))
+    }
+}
+
+impl<Credential> AuthenticationProtocolConfigure<reqwest::Request>
+    for BasicAuthentication<Credential>
+where
+    Credential: AuthenticationCredential,
+    <Credential as AuthenticationCredential>::Fetch: FetchedUsernamePassword,
+{
+    fn configure(&self, mut builder: reqwest::Request) -> Result<reqwest::Request, AuthenticError> {
         let fetched = self.credential.fetch()?;
         let value = ::http_auth::basic::encode_credentials(fetched.username(), fetched.password());
-        let mut header_value = HeaderValue::try_from(value)?;
+        let mut header_value = ::reqwest::header::HeaderValue::try_from(value)?;
         header_value.set_sensitive(true);
-        Ok(builder.header(hyper::header::AUTHORIZATION, header_value))
+        builder
+            .headers_mut()
+            .append(reqwest::header::AUTHORIZATION, header_value);
+        Ok(builder)
     }
 }
 
@@ -225,9 +284,9 @@ where
     Credential: AuthenticationCredential,
     <Credential as AuthenticationCredential>::Fetch: FetchedUsernamePassword,
 {
-    type Request = hyper::Request<hyper::Body>;
-    type Response = hyper::Response<hyper::Body>;
-    type Error = hyper::Error;
+    type Request = reqwest::Request;
+    type Response = reqwest::Response;
+    type Error = reqwest::Error;
 
     fn step(&self) -> Result<Option<AuthenticationStep<Self::Request>>, AuthenticError> {
         match self {
@@ -250,7 +309,7 @@ where
                     let pw_client = ::http_auth::PasswordClient::try_from(
                         response
                             .headers()
-                            .get_all(::hyper::header::WWW_AUTHENTICATE),
+                            .get_all(::reqwest::header::WWW_AUTHENTICATE),
                     )
                     .map_err(AuthenticError::Other)?;
                     match pw_client {
@@ -279,7 +338,7 @@ where
 }
 
 #[cfg(feature = "loop")]
-impl<Credential> AuthenticationProtocolConfigure<http::request::Builder>
+impl<Credential> AuthenticationProtocolConfigure<reqwest::RequestBuilder>
     for HttpAuthentication<Credential>
 where
     Credential: AuthenticationCredential,
@@ -287,8 +346,23 @@ where
 {
     fn configure(
         &self,
-        builder: http::request::Builder,
-    ) -> Result<http::request::Builder, AuthenticError> {
+        builder: reqwest::RequestBuilder,
+    ) -> Result<reqwest::RequestBuilder, AuthenticError> {
+        match self {
+            Self::Initial(_) => Ok(builder),
+            Self::Basic(basic) => basic.configure(builder),
+        }
+    }
+}
+
+#[cfg(feature = "loop")]
+impl<Credential> AuthenticationProtocolConfigure<reqwest::Request>
+    for HttpAuthentication<Credential>
+where
+    Credential: AuthenticationCredential,
+    <Credential as AuthenticationCredential>::Fetch: FetchedUsernamePassword,
+{
+    fn configure(&self, builder: reqwest::Request) -> Result<reqwest::Request, AuthenticError> {
         match self {
             Self::Initial(_) => Ok(builder),
             Self::Basic(basic) => basic.configure(builder),

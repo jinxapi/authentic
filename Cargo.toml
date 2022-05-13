@@ -13,13 +13,12 @@ repository = "https://github.com/jinxapi/authentic"
 all-features = true
 
 [features]
-default = ["loop"]
-
-hyper_async = ["hyper"]
-reqwest_async = ["reqwest"]
-reqwest_blocking = ["reqwest/blocking"]
+hyper-client = ["hyper"]
+reqwest-async = ["reqwest"]
+reqwest-blocking = ["reqwest/blocking"]
 jwt = ["jsonwebtoken", "arc-swap", "serde/derive"]
 loop = []
+step = []
 
 [dependencies]
 arc-swap = { version = "1.5.0", optional = true }

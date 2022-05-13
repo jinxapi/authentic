@@ -1,4 +1,4 @@
-#![cfg(feature = "reqwest")]
+#![cfg(feature = "reqwest-async")]
 
 use std::sync::Arc;
 
