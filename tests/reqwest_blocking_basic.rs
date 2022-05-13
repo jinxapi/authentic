@@ -1,4 +1,4 @@
-#![cfg(feature = "reqwest_blocking")]
+#![cfg(feature = "reqwest-blocking")]
 
 use std::sync::Arc;
 

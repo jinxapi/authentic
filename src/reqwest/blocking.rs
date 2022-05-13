@@ -1,5 +1,5 @@
 //! Authentication protocols for use with blocking `reqwest`.
-//! Use the `reqwest_blocking` feature to enable these.
+//! Use the `reqwest-blocking` feature to enable these.
 
 use std::borrow::Cow;
 use std::sync::Arc;

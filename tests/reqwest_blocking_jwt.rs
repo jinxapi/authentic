@@ -1,4 +1,4 @@
-#![cfg(all(feature = "reqwest_blocking", feature = "jwt"))]
+#![cfg(all(feature = "reqwest-blocking", feature = "jwt", feature = "step"))]
 
 use std::sync::Arc;
 use std::time::Duration;
